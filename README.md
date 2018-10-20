@@ -18,42 +18,6 @@ Profiling timing is done internally wrapping specific functions with MPI_Wtime c
 * Data exchange: measurement of the time it takes for the selected communication pattern to initiate and complete spike propagation.
 * Simulation time: overall global time to complete the simulation, including computation, implicit synchronisation and data exchange.
 
-
-## Results in the paper
-
-Results files from experiments in paper stored in results/archer and results/azure
-Python scripts to generate the figures in paper in plots/
-Implementation of communication algorithms in paper
-* PEX --> include/PEXCommunicator.h
-* NBX --> include/NBXCommunicator.h
-Implementation of workload distribution algorithms
-* Random Balanced --> include/RandomBalancedPartitioning.h
-* Round Robin --> include/RoundRobinPartitioning.h
-* Hypergraph partitioning --> include/HypergraphPartitioning.h
-- Description of main files
-* src/distSim.cpp --> simulator code, model builder
-Command used to get results in the paper
-
-For the scaling experiment of the CM model
-> mpirun -n $NUM_PROC -ppn $PROCESS_PER_NODE distSim -n cm_test -c $COMM_PATTERN -p $PARTITIONING -s $SEED -k 500 -f 1000 -t 750 -m "cm"
-
-For the scaling experiment of the MVC model
-> mpirun -n $NUM_PROC -ppn $PROCESS_PER_NODE distSim -n cm_test -c $COMM_PATTERN -p $PARTITIONING -s $SEED -k 1000 -f 200 -t 350 -m "mvc"
-
-Where (explain the variable names)
-
-
-## Instructions on how to run
-
-### Dependencies
-
-The C++ project dependencies are: 
-* [metis 5.1](http://glaros.dtc.umn.edu/gkhome/metis/metis/download)
-* [parmetis 4.0.3]( http://glaros.dtc.umn.edu/gkhome/metis/parmetis/download)
-* [zoltan 3.83](http://www.cs.sandia.gov/Zoltan/Zoltan_download.html)
-* An instalation of MPI (OpenMPI 3.0.0 or MPI Intel 5.X used in the paper)
-* C++11 minimum
-
 ### Compilation 
 
 The project can be compiled using the `Makefile` included. First, modify the `Makefile` path variables to dependency libraries to point to the appropriate folder in your instalation:
@@ -67,6 +31,8 @@ Then you can compile the project with
 
 	
 ### Running. Parameters
+
+The application must be run with a series of arguments that configure the simulation:
 ```
 -n: test name
 -c: communication pattern ('pex' or 'nbx')
@@ -78,6 +44,52 @@ Then you can compile the project with
 -t: simulated time in ms
 -m: model selection ('cm' or 'mcv')
 ```
+For example, the following command would be used to run a 100ms simulation of the full CM model, with NBX communication algorithm and round robin distribution, in 12 distributed processes, with 123456 as random seed:
+> mpirun -n 12 distSim -n test -c nbx -p roundrobin -t 100 -m cm -s 123456
+
+## Results in the paper
+
+The result files presented in the paper for the CM simulations are included in the folder `results/archer`, and the MVC simulations are included in `results/azure`.
+
+All the figures were generated with Python scripts, which are included in the folder `plots`.
+
+The code implementation of the different communication algorithms presented in the paper can be found in:
+* PEX --> `include/PEXCommunicator.h`
+* NBX --> `include/NBXCommunicator.h`
+
+The code implementation of the different workload distribution algorithms presented in the paper can be found in:
+* Random Balanced --> `include/RandomBalancedPartitioning.h`
+* Round Robin --> `include/RoundRobinPartitioning.h`
+* Hypergraph partitioning --> `include/HypergraphPartitioning.h`
+
+The code for the simulator and the model builder can be found in `src/distSim.cpp`
+
+### Command used to get results in the paper
+
+The following command runs the scaling experiment of the CM model:
+> mpirun -n $NUM_PROC -ppn $PROCESS_PER_NODE distSim -n cm_test -c $COMM_PATTERN -p $PARTITIONING -s $SEED -k 500 -f 1000 -t 750 -m "cm"
+
+The following command runs the scaling experiment of the MVC model:
+> mpirun -n $NUM_PROC -ppn $PROCESS_PER_NODE distSim -n cm_test -c $COMM_PATTERN -p $PARTITIONING -s $SEED -k 1000 -f 200 -t 350 -m "mvc"
+
+In both cases, the variable names (in capitals and preceded by the symbol $) are:
+* `$NUM_PROC`: number of distributed (MPI) processes used in the simulation
+* `$PROCESS_PER_NODE`: number of processes in a computing node (24 for ARCHER, 16 for Azure H16mr nodes)
+* `$COMM_PATTERN`: the communication pattern used in the simulation (in the paper, either `'randomBalanced'`, `'roundrobin'` or `'hypergraphPartitioning'`
+* `$SEED`: random seed of the experiment (for repeatability)
+
+
+## Instructions on how to run
+
+### Dependencies
+
+The C++ project dependencies are: 
+* [metis 5.1](http://glaros.dtc.umn.edu/gkhome/metis/metis/download)
+* [parmetis 4.0.3]( http://glaros.dtc.umn.edu/gkhome/metis/parmetis/download)
+* [zoltan 3.83](http://www.cs.sandia.gov/Zoltan/Zoltan_download.html)
+* An instalation of MPI (OpenMPI 3.0.0 or MPI Intel 5.X used in the paper)
+* C++11 minimum
+
 
 ## References
 - Schmidt, M., Bakker, R., Hilgetag, C. C., Diesmann, M., & van Albada, S. J. (2018). Multi-scale account of the network structure of macaque visual cortex. Brain Structure and Function, 223(3), 1409–1435. https://doi.org/10.1007/s00429-017-1554-4
