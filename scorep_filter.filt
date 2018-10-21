@@ -1,0 +1,14 @@
+SCOREP_REGION_NAMES_BEGIN
+	EXCLUDE
+		#SCOREP REGIONS
+		#*updateSynapse*
+		#NEURON AND SYNAPSE CALLS (LOCAL)
+		*spike*
+		*init_synapse*
+		*add_input_current*
+		*update_current*
+		*update_potential*
+		*clear_input*
+		#VECTOR CALLS (COSTLY!)		
+		*vector*
+SCOREP_REGION_NAMES_END

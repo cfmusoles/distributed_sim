@@ -1,0 +1,196 @@
+CREDENTIALS
+
+SAFE account https://www.archer.ac.uk/safe/
+	username c.f.musoles@sheffield.ac.uk
+	password Uni val with capital and 3 + $84
+
+Login: ssh -l musoles login.archer.ac.uk
+	username musoles
+	password: Carlo$FernandezMu$oles84
+
+SOFTWARE TO INSTALL
+
+To compile, switch to GNU gcc
+	module switch PrgEnv-cray PrgEnv-intel
+	module load gcc
+
+CMake
+	wget http://www.cmake.org/files/v2.8/cmake-2.8.3.tar.gz
+	tar xzf cmake-2.8.3.tar.gz
+	cd cmake-2.8.3
+	./configure --prefix=~/cmake-2.8.3/build
+	make
+	make install
+	add to .bashrc
+		export PATH="/home/e582/e582/musoles/cmake-2.8.3/build/bin:$PATH"
+
+install METIS
+	wget http://glaros.dtc.umn.edu/gkhome/fetch/sw/metis/metis-5.1.0.tar.gz
+	tar xvf metis-5.1.0.tar.gz
+	cd metis-5.1.0
+	Edit the file include/metis.h and specify the width (32 or 64 bits) of the
+	   elementary data type used in METIS. This is controled by the IDXTYPEWIDTH
+	   constant.
+	make config cc=cc cxx=CC prefix=~/metis-5.1.0/build
+	make
+	make install
+install ParMETIS (needs to be built with the MPI compiler that is going to be used with)
+	wget http://glaros.dtc.umn.edu/gkhome/fetch/sw/parmetis/parmetis-4.0.3.tar.gz
+	tar xvf parmetis-4.0.3.tar.gz
+	cd parmetis-4.0.3
+	Edit the file metis/include/metis.h and specify the width (32 or 64 bits) of the
+	   elementary data type used in METIS. This is controled by the IDXTYPEWIDTH
+	   constant
+	make config cc=cc cxx=CC prefix=~/parmetis-4.0.3/build/
+	make
+	make install
+
+Zoltan
+	wget http://www.cs.sandia.gov/~kddevin/Zoltan_Distributions/zoltan_distrib_v3.83.tar.gz
+	tar -xvf zoltan_distrib_v3.83.tar.gz
+	cd Zoltan_v3.83
+	mkdir build
+	cd build
+	../configure -C CC=cc CXX=CC --prefix=$HOME/Zoltan_v3.83/build --enable-mpi --with-mpi-compilers --with-gnumake --with-id-type=ulong
+	with parmetis (does not seem to work)
+		../configure -C CC=cc CXX=CC --prefix=$HOME/Zoltan_v3.83/build --enable-mpi --with-mpi-compilers --with-gnumake --with-id-type=ulong --with-parmetis --with-parmetis-incdir=$HOME/parmetis-4.0.3/build/include --with-parmetis-libdir=$HOME/parmetis-4.0.3/build/lib CFLAGS="-I$HOME/metis-5.1.0/build/include/" LDFLAGS="-L$HOME/metis-5.1.0/build/lib"
+	make everything
+	make install
+
+TRANSFER DATA
+
+Via scp command
+	To archer
+		scp -r folder musoles@login.archer.ac.uk:destination_folder_path
+
+
+
+ENVIRONMENT VARIABLES
+
+Via .bashrc
+WORK_DIR contains the path for the project's working directory
+	/work/e582/e582/musoles
+
+
+
+FILE SYSTEMS
+
+/home
+	Should be used for compiling and file editing
+	backed up, up to 60TB
+	
+/work
+	high performance lustre for work submission
+	/work/PROJECT/PROJECT/musoles for personal use
+	should only contain data if it is in current use (execution)
+
+
+SUBMIT WORK
+
+create a directory within $WORK_DIR to submit jobs
+
+create a .pbs script
+
+	#!/bin/bash --login
+
+	#PBS -N hello # name of the job
+	#PBS -l select=1 # how many nodes
+	#PBS -l walltime=0:5:0
+	#PBS -A e582 #this is the budget code
+
+	# This shifts to the directory that you submitted the job from
+	cd $PBS_O_WORKDIR
+
+	aprun -n 24 ./hello
+
+	#cat output*.out > helloworld.out
+
+submit a job
+	To the quick queue (1 node max, working hours)
+		qsub -q short submit.pbs
+	To the normal queue (large jobs)
+		qsub submit.pbs
+
+Query jobs
+	qstat -u musoles
+
+
+COMPILE AND BUILD
+
+To get the gcc compilers
+	module switch PrgEnv-cray PrgEnv-intel
+	module load gcc
+
+To switch to any gcc version
+	module swap gcc gcc/4.8
+
+For c++ compiler, use CC when compiling
+
+For c compiler, use cc when compiling
+
+
+
+ARCHER INSTRUMENTATION WITH CrayPAT tools
+info: http://www.archer.ac.uk/documentation/best-practice-guide/performance.php
+
+Set env variables (to enable mosaic report)	
+	setenv PAT_RT_SUMMARY 0
+	or export PAT_RT_SUMMARY=0
+Load modules
+	module load perftools-base
+	modlue load perftools
+Compile program
+	CC -o program program.c
+Build instrumentation
+	pat_build program
+	pat_build -g mpi (for mpi_sm_rank_order reports)
+Run program
+	aprun XXXX program+pat
+Create reports
+	pat_report program+pat+NODEID.xf
+Reinstrument program (for tracing analysis)
+	pat_build -O program+pat_NODEIDt.apa
+	pat_build -g mpi -O program+pat_NODEIDt.apa (for mpi tracing only)
+Re run program
+	aprun program+apa
+Produce final reports
+	pat_report program+apa+NODE2IDt.xf
+	pat_report -O mpi_callers program+pat+NODE2IDt.xf --> for mpi send receive statistics
+An .ap2 file contains report data
+
+-------------------------------------------------------------------------
+FOR MPI benchmark: Use p2p benchmark: https://github.com/cea-hpc/hp2p
+-------------------------------------------------------------------------
+
+Set env variables (to enable mosaic report)	
+	setenv PAT_RT_SUMMARY 0
+	or export PAT_RT_SUMMARY=0
+Load modules
+	module switch PrgEnv-cray PrgEnv-intel
+	module load perftools-base
+	module load perftools
+	module load gcc
+Compile program
+	CC -o hp2p hp2p.cpp
+Build instrumentation
+	pat_build -g mpi hp2p
+Run program
+	aprun -n X ./hp2p+pat -n X-1 -s 1024 -m K -b 1 -o test -c 1
+		where X is the number of MPI processes
+		K is the number of iterations per pair send (1 could be enough for network distance)
+ 
+Produce final reports
+	Single file (for ≤ 256 PEs) or directory containing multiple (~ sqrt(PEs)) files 
+	Can be changed with PAT_RT_EXPFILE_MAX
+	pat_report hp2p+apa+NODE2IDt.xf
+	or pat_report -f ap2-xml hp2p+apa+NODE2IDt.ap2 for xml output
+
+An .ap2 file contains report data
+
+Network distance with script: https://github.com/mbareford/craypat-perftools-pps
+	Network distance
+		python app2mosaic_full_display -d 2 hp2p+pat+NODEIDt.ap2-xml
+	Comm summary
+		python app2mosaic_full_display -node-summary hp2p+pat+NODEIDt.ap2-xml
+	
+

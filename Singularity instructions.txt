@@ -1,0 +1,49 @@
+1) Download bootstrap file https://github.com/Bundenth/distributed_sim_bootstrap/blob/master/Singularity
+
+2) Create singularity image and bootstrap
+	sudo singularity create --size 2048 distributed_sim.img
+	sudo singularity bootstrap distributed_sim.img Singularity
+
+3) Download application: (attached to email)
+
+4) Compile code with singularity image
+	cd path/to/application
+	singularity exec distributed_sim.img make
+
+5) Change permissions on executable
+	cd path/to/application
+	chmod +x distSim
+
+6) Execute experiment(s) with NUMBER_PROCESSES being the number of MPI processes desired
+	a) manually: mpirun -np NUM_PROCESSES distSim results
+	b) batch (10x iterations): 
+		copy both singularity image and application over to your home folder in SHARC (or any folder that will be visible by your singularity image)
+		edit singularity_job.sh (specify PROCESSES and match that with -pe mpi XX config)
+		edit singularity_job.sh (specify the appropriate IMAGE_PATH (singularity image), IMAGE_NAME and APP_PATH (path where the app can be found in sharc) 
+		qsub singularity_job.sh
+
+7) Collect results
+	* results__XX.txt: contains statistics about the experiment
+	* (if run in batch) node_info_XX: contains info regarding nodes used in sharc
+ 
+
+DEPENDENCIES
+
+- Singularity
+- Installed libs
+	OpenMPI 2.0.1 is installed in the image; since singularity requires mpirun to be called outside the image (mpirun [] singularity exec...) it is probably a good idea if the version of OpenMPI in your computer and the one packed with singularity match (not sure if this breaks things). 
+	Similarly, the image contains GCC version 4.9.4.
+
+
+RESULTS LEGEND
+
+Each column indicates a value from the simulation:
+1) Sim time: Total simulation time
+2) Comp diff: Computational (local computation) time difference (in percentage) between slowest and fastest process
+3) Propagation time: Average time spent in generating and propagating messages between processes
+4) Prop time diff: Difference (in percentage) in the time spent in propagating between fastest and slowest process
+5) Sync time: average time spent in synchronisation of MPI messages (MPI_Send, MPI_Recv, MPI_Barrier...)
+6) Bytes sent: Theoretical minimum number of bytes sent across processes during sim. This number is calculated manually by summing up the buffer sizes of calls to MPI functions (the actual message size is slightly more due to MPI implementations).
+7) Messages sent: theoretical number of messages sent (when using MPI_Send this is exactly correct, but when using collective operations such as MPI_Allgather, this number becomes a theoretical minimum)
+
+

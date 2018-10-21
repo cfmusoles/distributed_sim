@@ -1,0 +1,14 @@
+--- Vogels-Abbott Network Simulation ---
+Nodes                  : 1
+Simulation type        : CUBA
+Number of Neurons      : 4000
+Number of Synapses     : 204712 e→e  50975 e→i  50944 i→e  12964 i→i
+Excitatory conductance : 0.27 nS
+Inhibitory conductance : 4.5 nS
+Excitatory rate        : 5.62688 Hz
+Inhibitory rate        : 5.65125 Hz
+Build time             : 2.75136 s
+Simulation time        : 1.46812 s
+Writing time           : 4.35426 s
+
+

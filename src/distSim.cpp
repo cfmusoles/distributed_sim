@@ -60,6 +60,8 @@
 #include "RandomPartitioning.h"
 #include "RandomBalancedPartitioning.h"
 #include "CustomPartitioning.h"
+#include "PRAWFilePartitioning.h"
+#include "ZoltanFilePartitioning.h"
 #include "RoundRobinPartitioning.h"
 #include "Connectivity.h"
 #include "RandomConnectivity.h"
@@ -1424,6 +1426,12 @@ int main(int argc, char** argv) {
 		PRINTF("%i: Partitioning: custom\n",process_id);
 		if(custom_partitioning == NULL) partition = new RandomPartitioning(&pops,population_size);
 		else partition = new CustomPartitioning(&pops,population_size,custom_partitioning);
+	} else if(strcmp(part_method,"praw") == 0) {  
+		PRINTF("%i: Partitioning: PRAW\n",process_id);
+		partition = new PRAWFilePartitioning(&pops,population_size,comm_bandwidth_matrix_file);
+	} else if(strcmp(part_method,"zoltanFile") == 0) {  
+		PRINTF("%i: Partitioning: Zoltan from file\n",process_id);
+		partition = new ZoltanFilePartitioning(&pops,population_size);
 	} else if(strcmp(part_method,"roundrobin") == 0) {  
 		PRINTF("%i: Partitioning: Round robin\n",process_id);
 		partition = new RoundRobinPartitioning(&pops,population_size);

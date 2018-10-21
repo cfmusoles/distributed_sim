@@ -1,0 +1,55 @@
+<html>
+
+<body>
+
+<h4>PyNN implementation of benchmarks 1 and 2</h4>
+
+<p>from the paper<br>
+
+ Brette R, Rudolph M, Carnevale T, Hines M, Beeman D, Bower JM,
+ Diesmann M, Morrison A, Goodman PH, Harris Jr. FC, Zirpe M,
+ Natschlager T, Pecevski D, Ermentrout B, Djurfeldt M, Lansner A,
+ Rochel O, Vieville T, Muller E, Davison AP, El Boustani S and
+ Destexhe A.  Simulation of networks of spiking neurons: A review 
+ of tools and strategies.  Journal of Computational Neuroscience,
+ vol 23, p 349-398, 2007
+</p>
+
+<h5>Obtaining and installing PyNN</h5>
+<p>Download the latest source distribution from the
+<a href="http://neuralensemble.org/trac/PyNN/wiki/Download">PyNN download page</a>, then run the setup script, e.g.:</p>
+
+<p><pre>
+  $ tar xzf PyNN-0.4.0.tar.gz
+  $ cd PyNN-0.4.0
+  $ python setup.py install
+</pre></p>
+
+<p>For more detailed installation instructions, and the full users ' guide, go to
+<a href="http://neuralensemble.org/PyNN">http://neuralensemble.org/PyNN</a>.</p>
+
+<h5>Running the simulations:</h5>
+<p>Change to the directory corresponding to the version of PyNN that you have
+then run:</p>
+<pre>
+  $ python VAbenchmarks.py &lt;simulator&gt; &lt;benchmark&gt;
+</pre>
+<p>&lt;simulator&gt; is either neuron, nest1,
+nest2, or pcsim><br>
+&lt;benchmark&gt; is either CUBA or COBA.</p>
+<p>This will create a subdirectory 'Results' and write the datafiles in it.
+    
+<h5>Plotting results</h5>
+
+(requires <a href="http://matplotlib.sourceforge.net/">matplotlib</a> and <a href="http://neuralensemble.org/NeuroTools/">NeuroTools</a>)
+
+<pre>
+  $ python VAbenchmark_graphs.py &lt;results_filename&gt; 
+</pre>
+<p>If you didn't use a particular simulator, remove it from the argument list.</p>
+
+<p>This will create a figure in PNG format in the Results directory. The figures should look something like this:<br>
+<img src="VAbenchmark_CUBA.png" alt="CUBA figure"> <img src="VAbenchmark_COBA.png" alt="COBA figure"></p>
+
+</body>
+</html>
