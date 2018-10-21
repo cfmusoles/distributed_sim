@@ -1,3 +1,8 @@
+## Branch information
+
+This branch corresponds to @cfmusoles personal version of the project, including architecture-specific details for ARCHER and system install paths.
+
+
 # Distributed SNN simulation
 
 This repository contains code associated with the paper submitted to Frontiers in Neuroinformatics titled ***"Communication sparsity in distributed Spiking Neural Network Simulations to improve scalability"*** (approval pending). It consists of a simple SNN timestepped simulator and the implementation of two SNN models: Cortical Microcircuit (Potjans and Diesmann, 2014), and  Macaque Visual Cortex (Schmidt, 2018). 
