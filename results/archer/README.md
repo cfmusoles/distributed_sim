@@ -9,7 +9,7 @@ Each experiment contains two types of result files:
 ## Result timing files
 
 The result timings files are named as follows:
-> sparse_comm_st_$DISTRIBUTION_$COMM_PATTERN__$TOTAL_NUM_PROC
+> sparse_comm_st_$PARTITIONING_$COMM_PATTERN__$NUM_PROC
 
 The result timing files contain a header that describes the values represented on each column. The more representative colums are:
 * Build time: time it took to build the model and prepare the simulation (workload distribution)
@@ -26,7 +26,7 @@ The result timing files contain a header that describes the values represented o
 ## Tracing files
 
 For each scaling experiment, there are as many tracing files as number of processes used. The files are named as follows:
-> sparse_comm_st_$DISTRIBUTION_$COMM_PATTERN_$TOTAL_NUM_PROC_$PROCESS_ID
+> sparse_comm_st_$PARTITIONING_$COMM_PATTERN_$NUM_PROC_$PROCESS_ID
 
 The tracing files contain a header that describes the values represented on each column. The more representative colums are:
 * Comp time: time the process spent in computation phase
