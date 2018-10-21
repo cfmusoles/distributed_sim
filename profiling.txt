@@ -1,31 +1,3 @@
-*** DISTRIBUTED SIMULATOR ***
-
-Compiling instructions:
-
-In order to run the code, you must compile it issuing the command:
-
-make
-
-Which will generate the distSim executable in Linux. To compile it, you must have the library METIS installed and configured in your system (ParMETIS and SCALASCA are optional and should not be a problem if you do not have them. METIS is quite simple to install and configure, see:
-
-Download: http://glaros.dtc.umn.edu/gkhome/metis/metis/download
-Manual: http://glaros.dtc.umn.edu/gkhome/fetch/sw/metis/manual.pdf
-
-Note that the makefile expects METIS to be installed in the following folder: $(HOME)/metis_build. If you choose to have it elsewhere, please modify the Makefile to point towards the correct folder.
-
-Running instructions:
-
-To run the simulation, issue the following command from the project folder:
-
-mpirun -np XX distSim test_name comm_pattern partitioning
-
-Where XX is the number of processes you want to use, and the parameters after distSim can be specified as follows:
-
-* test_name: name of the filename that contains simulation results (including sim time, sync time, etc.).
-* comm_pattern: option to specify the MPI communication strategy to be used. The options are: allGather (to use MPI_AllGatherv to send messages between processes), p2p (to use the point-2-point with master node coordination) and subscriber (to use the point-2-point with preloaded sender lists). See the PDF attached for more info on each of the strategies.
-* partitioning: specify whether to use graph partitioning to distribute workload (using graphPartitioning) or random allocation (using random).
-
-
 GENERAL NOTES
 
 This folder contains a prototype for a distributed neuronal simulator. 

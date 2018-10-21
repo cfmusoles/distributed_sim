@@ -9,13 +9,13 @@ SRC_EXT = cpp
 FILES = $(shell find $(SRC_PATH) -name '*.$(SRC_EXT)' | sort -k 1nr |cut -f2-) 
 OUT = $(project)
 
-INCLUDES = -I./include -I../PRAW/include -I$(HOME)/parmetis_ompi_build/include -I$(HOME)/metis_build/include -I$(HOME)/scorep-3.0/include -I$(HOME)/Zoltan_v3.83/build/include 
+INCLUDES = -I./include -I../PhD/PRAW/include -I$(HOME)/parmetis_ompi_build/include -I$(HOME)/metis_build/include -I$(HOME)/scorep-3.0/include -I$(HOME)/Zoltan_v3.83/build/include 
 LIBS = -L$(HOME)/parmetis_ompi_build/lib -L$(HOME)/metis_build/lib -L$(HOME)/Zoltan_v3.83/build/lib
  
-INCLUDES_INTEL = -I./include -I../PRAW/include -I$(HOME)/parmetis_intel_build/include -I$(HOME)/metis_build/include -I$(HOME)/scorep-3.0/include -I$(HOME)/Zoltan_v3.83_intel/build/include 
+INCLUDES_INTEL = -I./include -I../PhD/PRAW/include -I$(HOME)/parmetis_intel_build/include -I$(HOME)/metis_build/include -I$(HOME)/scorep-3.0/include -I$(HOME)/Zoltan_v3.83_intel/build/include 
 INTEL_LIBS = -L$(HOME)/metis_build/lib -L$(HOME)/parmetis_intel_build/lib  -L$(HOME)/Zoltan_v3.83_intel/build/lib 
 
-INCLUDES_ARCHER = -I./include -I../PRAW/include -I$(HOME)/parmetis-4.0.3/build/include -I$(HOME)/metis-5.1.0/build/include -I$(HOME)/Zoltan_v3.83/build/include 
+INCLUDES_ARCHER = -I./include -I../PhD/PRAW/include -I$(HOME)/parmetis-4.0.3/build/include -I$(HOME)/metis-5.1.0/build/include -I$(HOME)/Zoltan_v3.83/build/include 
 ARCHER_LIBS = -L$(HOME)/metis-5.1.0/build/lib -L$(HOME)/parmetis-4.0.3/build/lib -L$(HOME)/Zoltan_v3.83/build/lib 
 
 LDFLAGS = -lmetis -lparmetis -lzoltan
