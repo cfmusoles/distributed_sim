@@ -73,11 +73,12 @@ The following command runs the scaling experiment of the MVC model:
 > mpirun -n $NUM_PROC -ppn $PROCESS_PER_NODE distSim -n cm_test -c $COMM_PATTERN -p $PARTITIONING -s $SEED -k 1000 -f 200 -t 350 -m "mvc"
 
 In both cases, the variable names (in capitals and preceded by the symbol $) are:
-* `$NUM_PROC`: number of distributed (MPI) processes used in the simulation
+* `$NUM_PROC`: number of distributed (MPI) processes used in the simulation (96,192,384,768,1536,3072)
 * `$PROCESS_PER_NODE`: number of processes in a computing node (24 for ARCHER, 16 for Azure H16mr nodes)
-* `$COMM_PATTERN`: the communication pattern used in the simulation (in the paper, either `'randomBalanced'`, `'roundrobin'` or `'hypergraphPartitioning'`
-* `$SEED`: random seed of the experiment (for repeatability)
+* `$COMM_PATTERN`: the communication pattern used in the simulation (`'randomBalanced'`, `'roundrobin'` or `'hypergraphPartitioning'`
+* `$SEED`: random seed of the experiment (random numbers used for repeatability)
 
+The values used to produce the results in the paper are indicated in brackets.
 
 ## Instructions on how to run
 
