@@ -11,17 +11,17 @@ min_num_processes = 96
 max_num_processes = 288
 process_step = 32
 #for geometric scaling of processors
-num_experiments = 6
+num_experiments = 4
 geometric_step = 2
 
 show_error = True
 as_bar_plot = False
 
-folder = "../results/archer/data/"
+folder = "../results/azure/"
 # each element on the following arrays corresponds to an experiment run (collection of files)
-experiments = ["sparse_comm_st_randomBalanced_pex_pruned","sparse_comm_st_randomBalanced_nbx_pruned","sparse_comm_st_hypergraphPartitioning_pex_pruned","sparse_comm_st_hypergraphPartitioning_nbx_pruned"] # plot more than one set of results in the graphs
+experiments = ["mcv_roundrobin_pex_pruned","mcv_hypergraphPartitioning_nbx_pruned"]#,"sparse_comm_st_hypergraphPartitioning_pex_pruned","sparse_comm_st_hypergraphPartitioning_nbx_pruned"] # plot more than one set of results in the graphs
 colours = ["red","green","blue","orange"] # as many as the number of experiments included
-legend_labels = ['Random-PEX','Random-NBX','Hypergraph partition-PEX','Hypergraph partition-NBX']
+legend_labels = ['Round Robin-PEX','HP-NBX','Hypergraph partition-PEX','Hypergraph partition-NBX']
 
 # Each element on the following arrays corresponds to a column in columns_to_plot
 columns_to_plot = [1,2,3,6,7]
@@ -55,8 +55,6 @@ else:
 	w = (max_num_processes - min_num_processes+1) / process_step
 	experiment_range = range(min_num_processes, max_num_processes+1,process_step)
 	
-
-
 def get_data_from_csv(filename):
 	data = np.genfromtxt(filename,skip_header=1,delimiter=",")
 	return data
@@ -80,8 +78,8 @@ def plot(x,y, error,title,xlabel,ylabel,name,colour,legend,show,global_counter):
 	plt.xlabel(xlabel)
 	plt.ylabel(ylabel)
 	plt.title(title)
+	plt.tick_params(axis='x',which='minor',bottom=False,labelbottom=False)
 	plt.xticks(experiment_range,experiment_range)
-	plt.tick_params(axis='x',which='minor',bottom=False)
 	#plt.tight_layout()
 	plt.gcf().subplots_adjust(left=0.17)
 	if len(experiments) > 1:

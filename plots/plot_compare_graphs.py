@@ -11,22 +11,22 @@ min_num_processes = 96
 max_num_processes = 288
 process_step = 32
 #for geometric scaling of processors
-num_experiments = 6
+num_experiments = 4
 geometric_step = 2
 colour = "green"
 
-folder = "../results/archer/data/"
+folder = "../results/azure/"
 # each element on the following arrays corresponds to an experiment run (collection of files)
 # only 2 are acceptable
-experiments = ["sparse_comm_st_randomBalanced_pex","sparse_comm_st_hypergraphPartitioning_nbx"] # plot more than one set of results in the graphs
+experiments = ["mcv_roundrobin_pex_pruned","mcv_hypergraphPartitioning_nbx_pruned"] # plot more than one set of results in the graphs
 legend_label = ""#HP gain over Random"
 
 # Each element on the following arrays corresponds to a column in columns_to_plot
-columns_to_plot = [0,1,22] # 8, 3, 22
+columns_to_plot = [17,8,23] # 8, 3, 22
 scale_plots = [0,0,0] # if 0, show difference in percentage
-plot_title = ["Build time cost (HB-NBX)","Simulation time gain (HP-NBX over Random)","Avg. runtime neighbours (Random vs hypergraph)"]
+plot_title = ["Remote spikes (HB-NBX over round robin)","Data volume (HP-NBX over Round robin)","ARN reduction (Round Robin vs hypergraph)"]
 plot_xlabel = ["Number of processes","Number of processes","Number of processes"]
-plot_ylabel = ["Time loss (s)","Time gain (s)","ARN difference (%)"]
+plot_ylabel = ["Spikes sent difference (%)","Data exchanged difference (%)","ARN difference (%)"]
 image_format = 'pdf'
 plot_name = ["a1","a2","a3"]
 
@@ -60,7 +60,7 @@ def plot(x,y, error,title,xlabel,ylabel,name,colour,legend):
 	plt.xlabel(xlabel)
 	plt.ylabel(ylabel)
 	plt.xticks([e*1.25 for e in experiment_range],experiment_range)
-	plt.tick_params(axis='x',which='minor',bottom=False)
+	plt.tick_params(axis='x',which='minor',bottom=False,labelbottom=False)
 	plt.title(title)
 	#plt.ylim(0,50)
 	if not legend == "":
