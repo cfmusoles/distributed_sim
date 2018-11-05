@@ -10,7 +10,8 @@
 #PBS -A e582  
 
 APP_NAME="distSim"
-ITERATIONS=1
+ITERATIONS=3
+REPETITIONS=2
 PROCESSES=192
 EXPERIMENT_NAME="test"
 
@@ -22,9 +23,12 @@ run_experiment() {
 	DISTRIBUTION="$2"
 	COMM_PATTERN="$3"
 	SEED="$4"
-	FILENAME=$EXPERIMENT_NAME"_"$DISTRIBUTION"_"$COMM_PATTERN
-	aprun -n $P $APP_NAME -n $FILENAME -c $COMM_PATTERN -p $DISTRIBUTION -s $SEED
-	sleep 1
+	for i in $(seq 1 $REPETITIONS)
+	do
+		aprun -n $P $APP_NAME -n $EXPERIMENT_NAME -c $COMM_PATTERN -p $DISTRIBUTION -s $SEED -k 1000 -f 200 -t 350 -m "mvc"
+		sleep 1
+	done
+	
 }
 
 
@@ -36,8 +40,8 @@ cd $PBS_O_WORKDIR
 for i in $(seq 1 $ITERATIONS)
 do
 	SEED=$RANDOM
-	run_experiment $PROCESSES "randomBalanced" "pex" $SEED
-	run_experiment $PROCESSES "randomBalanced" "nbx" $SEED
+	run_experiment $PROCESSES "roundrobin" "pex" $SEED
+	run_experiment $PROCESSES "hypergraphPartitioning" "nbx" $SEED
 done
 
 
