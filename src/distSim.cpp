@@ -60,6 +60,8 @@
 #include "RandomPartitioning.h"
 #include "RandomBalancedPartitioning.h"
 #include "CustomPartitioning.h"
+//#include "PRAWFilePartitioning.h"
+//#include "ZoltanFilePartitioning.h"
 #include "RoundRobinPartitioning.h"
 #include "Connectivity.h"
 #include "RandomConnectivity.h"
@@ -311,7 +313,7 @@ int main(int argc, char** argv) {
 		MPI_Finalize();
 		return 0;
 	}
-	PRINTF("%i: Model selected %s, Neuron scale: %f, Synaptic scale: %f, Simulated time: %i\n",model_selected,n_scale,k_scale,t_end);
+	PRINTF("Model selected %s, Neuron scale: %f, Synaptic scale: %f, Simulated time: %i\n",model_selected,n_scale,k_scale,t_end);
 
 	// gathering comm patterns and partitioning methods
 	// user can supply multiple via : syntax (example: -c nbx:pex)
@@ -1221,6 +1223,7 @@ int main(int argc, char** argv) {
 		}
 	}
 
+
 	// injections
 	srand(random_seed); // ensure base population with same seed has same injectors connectivity
 	for(int ii=0; ii < injections.size(); ii++) {
@@ -1299,11 +1302,87 @@ int main(int argc, char** argv) {
 		
 	}
 
-	//////////////////////////////
-	/// TODO: Can we use Distributed CSR format to only store local neurons connectivity? (ParMETIS)
-	//////////////////////////////
 	// construct Model from connectivity and population objects
+	// to save memory, construct only in master node, then distribute complete model
 	int exc = 0, inh = 0;
+	model.population_size = population_size;
+	model.interconnections_size = (int*)calloc(model.population_size,sizeof(int));
+	model.interconnections = (int**)malloc(sizeof(int*) * model.population_size);
+	if(process_id == MASTER_NODE) {
+		// get the number of connections per pre synaptic neuron
+		for(int ii=0; ii < conns.size(); ii++) {
+			PRINTF("%i: Creating connection set %i out of %lu\n",process_id,ii+1,conns.size());
+			if(!MODEL_LOADED_FROM_FILE) conns[ii]->generate_connectivity(model.population_size);
+			for(int jj=0; jj < conns[ii]->connections.size(); jj++) {
+				int con_length = conns[ii]->connections[jj].size();
+				int nid = conns[ii]->from->neuron_ids[jj];
+				model.interconnections_size[nid] += con_length;
+			}
+		}
+		// initialise pre-synaptic neuron data structures
+		int* lastId = (int*)calloc(model.population_size,sizeof(int));
+		for(int ii=0; ii < model.population_size; ii++) {
+			model.interconnections[ii] = (int*)malloc(sizeof(int) * model.interconnections_size[ii]);
+		}
+		// assign post-synaptic neuron ids (and weights) to connection lists
+		for(int ii=0; ii < conns.size(); ii++) {
+			for(int jj=0; jj < conns[ii]->connections.size(); jj++) {
+				int con_length = conns[ii]->connections[jj].size();
+				int nid = conns[ii]->from->neuron_ids[jj];
+				for(int cc=0; cc < con_length; cc++) {
+					if(conns[ii]->from->type == EXC) {
+						model.interconnections[nid][lastId[nid]] = conns[ii]->connections[jj][cc];
+						exc++;
+					} else {
+						model.interconnections[nid][lastId[nid]] = -conns[ii]->connections[jj][cc];
+						inh++;
+					}
+					lastId[nid] += 1;
+				}
+			}
+			
+			// clean up connectivity object
+			delete conns[ii];
+		}
+		conns.clear();
+		free(lastId);
+
+		// send model to other processes
+		for(int ii=0; ii < num_processes; ii++) {
+			if(ii == MASTER_NODE) continue;
+			// exc and inh connection numbers
+			MPI_Send(&exc,1,MPI_INT,ii,0,MPI_COMM_WORLD);
+			MPI_Send(&inh,1,MPI_INT,ii,0,MPI_COMM_WORLD);
+			// model.interconnections_size
+			MPI_Send(model.interconnections_size,model.population_size,MPI_INT,ii,0,MPI_COMM_WORLD);
+			for(int jj=0; jj < model.population_size; jj++) {
+				MPI_Send(model.interconnections[jj],model.interconnections_size[jj],MPI_INT,ii,jj,MPI_COMM_WORLD);
+			}
+		}
+	} else {
+		// receive model from master node
+		// exc and inh connections
+		MPI_Recv(&exc,1,MPI_INT,MASTER_NODE,0,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
+		MPI_Recv(&inh,1,MPI_INT,MASTER_NODE,0,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
+		// model.interconnections_size
+		MPI_Recv(model.interconnections_size,model.population_size,MPI_INT,MASTER_NODE,0,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
+
+		// model.interconnections
+		for(int ii=0; ii < model.population_size; ii++) {
+			model.interconnections[ii] = (int*)malloc(sizeof(int) * model.interconnections_size[ii]);
+		}
+		for(int ii=0; ii < model.population_size; ii++) {
+			MPI_Recv(model.interconnections[ii],model.interconnections_size[ii],MPI_INT,MASTER_NODE,ii,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
+		}
+		// clean up conns structure
+		for(int ii=0; ii < conns.size(); ii++) {
+			delete conns[ii];
+		}
+		conns.clear();
+	}
+
+	
+	/*int exc = 0, inh = 0;
 	model.population_size = population_size;
 	// get the number of connections per pre synaptic neuron
 	model.interconnections_size = (int*)calloc(model.population_size,sizeof(int));
@@ -1344,6 +1423,8 @@ int main(int argc, char** argv) {
 	}
 	conns.clear();
 	free(lastId);
+	*/
+
 
 	
 	model.total_connections = exc + inh;
@@ -1399,1139 +1480,1146 @@ int main(int argc, char** argv) {
 			const char* comm_method = comm_pattern_methods[coms].c_str();
 			const char* part_method = partitioning_methods[pats].c_str();
 
-	srand(random_seed);
-	randgauss(0,0,true);
+			srand(random_seed);
+			randgauss(0,0,true);
 
-	// Create partition object to hold connections and partitioning information across processes
-	// Assign neurons to partitions
-	Partitioning* partition;
-	if(strcmp(part_method,"graphPartitioning") == 0) {
-		PRINTF("%i: Partitioning: graph partition (METIS)\n",process_id);
-		partition = new GraphPartitionPartitioning(&pops,population_size);
-	} else if(strcmp(part_method,"randomBalanced") == 0) {  
-		PRINTF("%i: Partitioning: random-balanced\n",process_id);
-		partition = new RandomBalancedPartitioning(&pops,population_size);
-	} else if(strcmp(part_method,"parallelPartitioning") == 0) {  
-		PRINTF("%i: Partitioning: parallel partitioning (PARMETIS)\n",process_id);
-		partition = new ParallelPartitionPartitioning(&pops,population_size);
-	} else if(strcmp(part_method,"hypergraphPartitioning") == 0) {  
-		PRINTF("%i: Partitioning: hypergraph partitioning (Zoltan)\n",process_id);
-		partition = new HypergraphPartitioning(&pops,population_size);
-	} else if(strcmp(part_method,"hierPartitioning") == 0) {  
-		PRINTF("%i: Partitioning: hypergraph hierarchical partitioning (Zoltan)\n",process_id);
-		partition = new HIERPartitioning(&pops,population_size);
-	} else if(strcmp(part_method,"custom") == 0) {  
-		PRINTF("%i: Partitioning: custom\n",process_id);
-		if(custom_partitioning == NULL) partition = new RandomPartitioning(&pops,population_size);
-		else partition = new CustomPartitioning(&pops,population_size,custom_partitioning);
-	} else if(strcmp(part_method,"roundrobin") == 0) {  
-		PRINTF("%i: Partitioning: Round robin\n",process_id);
-		partition = new RoundRobinPartitioning(&pops,population_size);
-	} else {
-		PRINTF("%i: Partitioning: random\n",process_id);
-		partition = new RandomPartitioning(&pops,population_size);
-	}
-	
-	partition->perform_partitioning(&model,num_processes,process_id,&previous_neuron_activity);
-
-	// fast access info
-	idx_t* parts = partition->partitioning;
-	int pop_size = model.population_size;
-	
-	// Communication strategy
-	Communicator* communicator;	
-	if(strcmp(comm_method,"subscriber") == 0) {
-		PRINTF("%i: Comm pattern: subscriber\n",process_id);
-		communicator = new SubscriberCommunicator(process_id, num_processes, MASTER_NODE,model.population_size);
-	} else if (strcmp(comm_method,"direct") == 0) {
-		communicator = new DirectCommunicator(process_id, num_processes, MASTER_NODE, model.population_size);
-		PRINTF("%i: Comm pattern: DirectP2P\n",process_id);
-	} else if(strcmp(comm_method,"rma") == 0) {
-		communicator = new RMACommunicator(process_id, num_processes, MASTER_NODE,model.population_size);
-		PRINTF("%i: Comm pattern: RMA\n",process_id);
-	} else if(strcmp(comm_method,"nbx") == 0) {
-		communicator = new NBXCommunicator(process_id, num_processes, MASTER_NODE,model.population_size);
-		PRINTF("%i: Comm pattern: NBX\n",process_id);
-	} else if(strcmp(comm_method,"pcx") == 0) {
-		communicator = new PCXCommunicator(process_id, num_processes, MASTER_NODE,model.population_size);
-		PRINTF("%i: Comm pattern: PCX\n",process_id);
-	} else if(strcmp(comm_method,"rsx") == 0) {
-		communicator = new RSXCommunicator(process_id, num_processes, MASTER_NODE,model.population_size);
-		PRINTF("%i: Comm pattern: RSX\n",process_id);
-	} else if(strcmp(comm_method,"pex") == 0) {
-		communicator = new PEXCommunicator(process_id, num_processes, MASTER_NODE,model.population_size);
-		PRINTF("%i: Comm pattern: PEX\n",process_id);
-	} else {
-		communicator = new AllGatherCommunicator(process_id, num_processes, MASTER_NODE,model.population_size);
-		PRINTF("%i: Comm pattern: All gather\n",process_id);
-	}
-	
-	
-	// Cost of partition cut (total)
-	// total computational load imbalance (as well as neuron and synaptic balances)
-	// calculated as max imbalance / average imbalance
-	// takes into account 1 unit per hosted neuron and 1 unit per incoming synapse to hosted neurons
-	// store the graph connectivity (list of connected partitions)
-	int* total_local_synapses = (int*)calloc(num_processes,sizeof(int));
-	int total_cut = 0;
-	int* neurons_in_partition = (int*)calloc(num_processes,sizeof(int));
-	std::vector<std::set<int> > partition_connectivity(num_processes);
-	for(int ii = 0; ii < model.population_size; ii++) {
-		neurons_in_partition[parts[ii]] += 1;
-		for(int jj=0; jj < model.interconnections_size[ii]; jj++) {
-			int part_number = parts[abs(model.interconnections[ii][jj])];
-			total_local_synapses[part_number] += 1;
-			if(parts[ii] != part_number) {
-				total_cut++;
-				partition_connectivity[parts[ii]].insert(parts[abs(model.interconnections[ii][jj])]);
+			// Create partition object to hold connections and partitioning information across processes
+			// Assign neurons to partitions
+			Partitioning* partition;
+			if(strcmp(part_method,"graphPartitioning") == 0) {
+				PRINTF("%i: Partitioning: graph partition (METIS)\n",process_id);
+				partition = new GraphPartitionPartitioning(&pops,population_size);
+			} else if(strcmp(part_method,"randomBalanced") == 0) {  
+				PRINTF("%i: Partitioning: random-balanced\n",process_id);
+				partition = new RandomBalancedPartitioning(&pops,population_size);
+			} else if(strcmp(part_method,"parallelPartitioning") == 0) {  
+				PRINTF("%i: Partitioning: parallel partitioning (PARMETIS)\n",process_id);
+				partition = new ParallelPartitionPartitioning(&pops,population_size);
+			} else if(strcmp(part_method,"hypergraphPartitioning") == 0) {  
+				PRINTF("%i: Partitioning: hypergraph partitioning (Zoltan)\n",process_id);
+				partition = new HypergraphPartitioning(&pops,population_size);
+			} else if(strcmp(part_method,"hierPartitioning") == 0) {  
+				PRINTF("%i: Partitioning: hypergraph hierarchical partitioning (Zoltan)\n",process_id);
+				partition = new HIERPartitioning(&pops,population_size);
+			} else if(strcmp(part_method,"custom") == 0) {  
+				PRINTF("%i: Partitioning: custom\n",process_id);
+				if(custom_partitioning == NULL) partition = new RandomPartitioning(&pops,population_size);
+				else partition = new CustomPartitioning(&pops,population_size,custom_partitioning);
+			} /*else if(strcmp(part_method,"praw") == 0) {  
+				PRINTF("%i: Partitioning: PRAW\n",process_id);
+				partition = new PRAWFilePartitioning(&pops,population_size,comm_bandwidth_matrix_file);
+			} else if(strcmp(part_method,"zoltanFile") == 0) {  
+				PRINTF("%i: Partitioning: Zoltan from file\n",process_id);
+				partition = new ZoltanFilePartitioning(&pops,population_size);
+			} */else if(strcmp(part_method,"roundrobin") == 0) {  
+				PRINTF("%i: Partitioning: Round robin\n",process_id);
+				partition = new RoundRobinPartitioning(&pops,population_size);
+			} else {
+				PRINTF("%i: Partitioning: random\n",process_id);
+				partition = new RandomPartitioning(&pops,population_size);
 			}
-		}	
-	}
-	double synapse_workload = 0;
-	int max_synapse_workload = 0;
-	double total_workload = 0;
-	int max_total_workload = 0;
-	double neuron_workload = 0;
-	int max_neuron_workload = 0;
-	for(int ii=0; ii < num_processes; ii++) {
-		total_workload += neurons_in_partition[ii] + total_local_synapses[ii];
-		if(neurons_in_partition[ii] + total_local_synapses[ii] > max_total_workload)
-			max_total_workload = neurons_in_partition[ii] + total_local_synapses[ii];
-		neuron_workload += neurons_in_partition[ii];
-		if(neurons_in_partition[ii] > max_neuron_workload) 
-			max_neuron_workload = neurons_in_partition[ii];
-		synapse_workload += total_local_synapses[ii];
-		if(max_synapse_workload < total_local_synapses[ii])
-			max_synapse_workload = total_local_synapses[ii];
-	}
-	neuron_workload /= num_processes;
-	total_workload /= num_processes;
-	synapse_workload /= num_processes;
-	double neuron_comp_imbalance = neuron_workload > 0 ? max_neuron_workload / neuron_workload: 0;
-	double total_comp_imbalance = total_workload > 0 ? max_total_workload / total_workload : 0;
-	double synapse_comp_imbalance = synapse_workload > 0 ? max_synapse_workload / synapse_workload : 0;
+			
+			partition->perform_partitioning(&model,num_processes,process_id,&previous_neuron_activity);
 
-	PRINTF("%i: Synapses cut: %i\n",process_id,total_cut);
-	PRINTF("%i: Neuronal computational imbalance: %f\n",process_id,neuron_comp_imbalance);
-	PRINTF("%i: Synaptic computational imbalance: %f\n",process_id,synapse_comp_imbalance);
-	PRINTF("%i: Total workload imbalance %f (%f)\n",process_id,total_comp_imbalance,total_workload);
-
-	free(total_local_synapses);
-	
-#ifdef PARTITION_CONNECTIVITY_GRAPH
-	// store partition connectivity graph in a file
-	if(process_id == MASTER_NODE) { 
-		std::string filename = sim_name;
-		char str_int[16];
-		filename += "_";
-		filename += part_method;
-		filename += "_";
-		filename += comm_method;
-		filename += "_partition_graph_";
-		sprintf(str_int,"%i",num_processes);
-		filename +=  str_int;
-
-		FILE *fp = fopen(filename.c_str(), "w+");
-		fprintf(fp,"%i\n",num_processes);
-		for(int ii=0; ii < num_processes; ii++) {
-			fprintf(fp,"%lu ",partition_connectivity[ii].size());
-			for (std::set<int>::iterator it = partition_connectivity[ii].begin(); it != partition_connectivity[ii].end(); ++it) {
-				fprintf(fp,"%i ",*it);
+			// fast access info
+			idx_t* parts = partition->partitioning;
+			int pop_size = model.population_size;
+			
+			// Communication strategy
+			Communicator* communicator;	
+			if(strcmp(comm_method,"subscriber") == 0) {
+				PRINTF("%i: Comm pattern: subscriber\n",process_id);
+				communicator = new SubscriberCommunicator(process_id, num_processes, MASTER_NODE,model.population_size);
+			} else if (strcmp(comm_method,"direct") == 0) {
+				communicator = new DirectCommunicator(process_id, num_processes, MASTER_NODE, model.population_size);
+				PRINTF("%i: Comm pattern: DirectP2P\n",process_id);
+			} else if(strcmp(comm_method,"rma") == 0) {
+				communicator = new RMACommunicator(process_id, num_processes, MASTER_NODE,model.population_size);
+				PRINTF("%i: Comm pattern: RMA\n",process_id);
+			} else if(strcmp(comm_method,"nbx") == 0) {
+				communicator = new NBXCommunicator(process_id, num_processes, MASTER_NODE,model.population_size);
+				PRINTF("%i: Comm pattern: NBX\n",process_id);
+			} else if(strcmp(comm_method,"pcx") == 0) {
+				communicator = new PCXCommunicator(process_id, num_processes, MASTER_NODE,model.population_size);
+				PRINTF("%i: Comm pattern: PCX\n",process_id);
+			} else if(strcmp(comm_method,"rsx") == 0) {
+				communicator = new RSXCommunicator(process_id, num_processes, MASTER_NODE,model.population_size);
+				PRINTF("%i: Comm pattern: RSX\n",process_id);
+			} else if(strcmp(comm_method,"pex") == 0) {
+				communicator = new PEXCommunicator(process_id, num_processes, MASTER_NODE,model.population_size);
+				PRINTF("%i: Comm pattern: PEX\n",process_id);
+			} else {
+				communicator = new AllGatherCommunicator(process_id, num_processes, MASTER_NODE,model.population_size);
+				PRINTF("%i: Comm pattern: All gather\n",process_id);
 			}
-			fprintf(fp,"\n");
-		}
-		fclose(fp);
-	}
-#endif
-	
-	// Potentially UNSAFE: since same seed, all processes do the partition equally
-	
-	//////
-	// create data structures (Neurons, Synapses and local CurrentInjectors) per process
-	//////
-	
-	//synchronise random generator
-	srand(random_seed);
-	
-	// initialise neuron population and current injector
-	PRINTF("%i: Initialising neurons and connections...\n",process_id);
-	// globalNeuronRefs --> array of global IDs to quickly locate local neurons on each partition
-	Neuron** globalNeuronRefs = NULL;
-	// list of local neurons only (starts full then will be trimmed
-	std::vector<Neuron> localNeurons;
-	int local_neurons = 0;
-	if(!model.null_compute) {
-		globalNeuronRefs = (Neuron**)calloc(model.population_size,sizeof(Neuron*));
-		localNeurons.resize(neurons_in_partition[process_id]);
-		for(int ii=0; ii < pops.size(); ii++) {
-			for(int jj=0; jj < pops[ii]->neuron_ids.size(); jj++) {
-				int neuronId = pops[ii]->neuron_ids[jj];
-				// we do the init voltage for all so the entire network shares initial voltage values 
-				// irrespective of the number of partitions
-				double init_v = randgauss(pops[ii]->cell_params->v_start_mean,pops[ii]->cell_params->v_start_dev);	// random start potential
-				init_v -= remainderf(init_v,0.1f); // round off voltage to one decimal (helps with float precision errors)
-				if(parts[neuronId] == process_id) {
-					// neuron is local
-					localNeurons[local_neurons].init(neuronId,pops[ii]->cell_params,init_v);
-					globalNeuronRefs[neuronId] = &localNeurons[local_neurons];
-					local_neurons++;
+			
+			
+			// Cost of partition cut (total)
+			// total computational load imbalance (as well as neuron and synaptic balances)
+			// calculated as max imbalance / average imbalance
+			// takes into account 1 unit per hosted neuron and 1 unit per incoming synapse to hosted neurons
+			// store the graph connectivity (list of connected partitions)
+			int* total_local_synapses = (int*)calloc(num_processes,sizeof(int));
+			int total_cut = 0;
+			int* neurons_in_partition = (int*)calloc(num_processes,sizeof(int));
+			std::vector<std::set<int> > partition_connectivity(num_processes);
+			for(int ii = 0; ii < model.population_size; ii++) {
+				neurons_in_partition[parts[ii]] += 1;
+				for(int jj=0; jj < model.interconnections_size[ii]; jj++) {
+					int part_number = parts[abs(model.interconnections[ii][jj])];
+					total_local_synapses[part_number] += 1;
+					if(parts[ii] != part_number) {
+						total_cut++;
+						partition_connectivity[parts[ii]].insert(parts[abs(model.interconnections[ii][jj])]);
+					}
+				}	
+			}
+			double synapse_workload = 0;
+			int max_synapse_workload = 0;
+			double total_workload = 0;
+			int max_total_workload = 0;
+			double neuron_workload = 0;
+			int max_neuron_workload = 0;
+			for(int ii=0; ii < num_processes; ii++) {
+				total_workload += neurons_in_partition[ii] + total_local_synapses[ii];
+				if(neurons_in_partition[ii] + total_local_synapses[ii] > max_total_workload)
+					max_total_workload = neurons_in_partition[ii] + total_local_synapses[ii];
+				neuron_workload += neurons_in_partition[ii];
+				if(neurons_in_partition[ii] > max_neuron_workload) 
+					max_neuron_workload = neurons_in_partition[ii];
+				synapse_workload += total_local_synapses[ii];
+				if(max_synapse_workload < total_local_synapses[ii])
+					max_synapse_workload = total_local_synapses[ii];
+			}
+			neuron_workload /= num_processes;
+			total_workload /= num_processes;
+			synapse_workload /= num_processes;
+			double neuron_comp_imbalance = neuron_workload > 0 ? max_neuron_workload / neuron_workload: 0;
+			double total_comp_imbalance = total_workload > 0 ? max_total_workload / total_workload : 0;
+			double synapse_comp_imbalance = synapse_workload > 0 ? max_synapse_workload / synapse_workload : 0;
+
+			PRINTF("%i: Synapses cut: %i\n",process_id,total_cut);
+			PRINTF("%i: Neuronal computational imbalance: %f\n",process_id,neuron_comp_imbalance);
+			PRINTF("%i: Synaptic computational imbalance: %f\n",process_id,synapse_comp_imbalance);
+			PRINTF("%i: Total workload imbalance %f (%f)\n",process_id,total_comp_imbalance,total_workload);
+
+			free(total_local_synapses);
+			
+		#ifdef PARTITION_CONNECTIVITY_GRAPH
+			// store partition connectivity graph in a file
+			if(process_id == MASTER_NODE) { 
+				std::string filename = sim_name;
+				char str_int[16];
+				filename += "_";
+				filename += part_method;
+				filename += "_";
+				filename += comm_method;
+				filename += "_partition_graph_";
+				sprintf(str_int,"%i",num_processes);
+				filename +=  str_int;
+
+				FILE *fp = fopen(filename.c_str(), "w+");
+				fprintf(fp,"%i\n",num_processes);
+				for(int ii=0; ii < num_processes; ii++) {
+					fprintf(fp,"%lu ",partition_connectivity[ii].size());
+					for (std::set<int>::iterator it = partition_connectivity[ii].begin(); it != partition_connectivity[ii].end(); ++it) {
+						fprintf(fp,"%i ",*it);
+					}
+					fprintf(fp,"\n");
+				}
+				fclose(fp);
+			}
+		#endif
+			
+			// Potentially UNSAFE: since same seed, all processes do the partition equally
+			
+			//////
+			// create data structures (Neurons, Synapses and local CurrentInjectors) per process
+			//////
+			
+			//synchronise random generator
+			srand(random_seed);
+			
+			// initialise neuron population and current injector
+			PRINTF("%i: Initialising neurons and connections...\n",process_id);
+			// globalNeuronRefs --> array of global IDs to quickly locate local neurons on each partition
+			Neuron** globalNeuronRefs = NULL;
+			// list of local neurons only (starts full then will be trimmed
+			std::vector<Neuron> localNeurons;
+			int local_neurons = 0;
+			if(!model.null_compute) {
+				globalNeuronRefs = (Neuron**)calloc(model.population_size,sizeof(Neuron*));
+				localNeurons.resize(neurons_in_partition[process_id]);
+				for(int ii=0; ii < pops.size(); ii++) {
+					for(int jj=0; jj < pops[ii]->neuron_ids.size(); jj++) {
+						int neuronId = pops[ii]->neuron_ids[jj];
+						// we do the init voltage for all so the entire network shares initial voltage values 
+						// irrespective of the number of partitions
+						double init_v = randgauss(pops[ii]->cell_params->v_start_mean,pops[ii]->cell_params->v_start_dev);	// random start potential
+						init_v -= remainderf(init_v,0.1f); // round off voltage to one decimal (helps with float precision errors)
+						if(parts[neuronId] == process_id) {
+							// neuron is local
+							localNeurons[local_neurons].init(neuronId,pops[ii]->cell_params,init_v);
+							globalNeuronRefs[neuronId] = &localNeurons[local_neurons];
+							local_neurons++;
+						}
+					}
 				}
 			}
-		}
-	}
-	free(neurons_in_partition);
-	
-	PRINTF("%i: Local neurons: %i\n",process_id,local_neurons);
-	// UNSAFE: random() may not be equal across processes since each process called random() (in Neuron constructor) an unequal amount of times
-	
-	
-	// create injection reservoires
-	PRINTF("%i: Culling injection reservoires\n",process_id);
-	for(int ii=0; ii < injections.size(); ii++) {
-		injections[ii]->cull_to_local_post_syn_neurons(partition->partitioning,process_id);
-	}
-	
-	// create target synapses for neuron (only if target is local process)
-	PRINTF("%i: Creating synapse counts\n",process_id);
-	int local_synapses = 0;
-	std::vector<Synapse> localSynapses;
-	std::vector<int> globalSynapse_xadj;
-	std::vector<int> globalSynapse_adjncy;
-	// count number of postsynaptic targets for each neuron
-	//std::vector<int> num_synapses(model.population_size,0);
-	for(int ii=0; ii < model.population_size; ii++) {
-		for(int jj=0; jj < model.interconnections_size[ii]; jj++) {
-			// ii -> presynaptic neuron; interconnections[ii][jj] --> postsynaptic neuron
-			// notify communicator
-			if(previous_neuron_activity[ii] > 0) // use previous activity info to determine if a link is going to become active
-				communicator->from_to_connection(ii,abs(model.interconnections[ii][jj]),parts);
-			if(parts[abs(model.interconnections[ii][jj])] == process_id) { 
-				//num_synapses[ii] += 1;
-				local_synapses++;
+			free(neurons_in_partition);
+			
+			PRINTF("%i: Local neurons: %i\n",process_id,local_neurons);
+			// UNSAFE: random() may not be equal across processes since each process called random() (in Neuron constructor) an unequal amount of times
+			
+			
+			// create injection reservoires
+			PRINTF("%i: Culling injection reservoires\n",process_id);
+			for(int ii=0; ii < injections.size(); ii++) {
+				injections[ii]->cull_to_local_post_syn_neurons(partition->partitioning,process_id);
 			}
-		}
-	}
-	
-	if(!model.null_compute) {	
-		PRINTF("%i: Creating synapse objects and references\n",process_id);
-		localSynapses.resize(local_synapses); // all local synapses
-		int syn_count;
-		if(local_synapses > 0) { // if there are no local synapses, skip assigning memory for them
-			syn_count = 0;
-			bool check_cell_params = cell_params.size() > 1;
-			globalSynapse_xadj.resize(pop_size+1);
-			for(int ii=0; ii < pop_size; ii++) {
-				int conn_size = model.interconnections_size[ii];
-				int jj=0;
-				globalSynapse_xadj[ii] = syn_count;
-				//for(int* con = model.interconnections[ii], jj = 0; jj < conn_size; jj++,con++) {
-				for(int p=0; p < conn_size; p++) {
-					int postneuron = abs(model.interconnections[ii][p]);
+			
+			// create target synapses for neuron (only if target is local process)
+			PRINTF("%i: Creating synapse counts\n",process_id);
+			int local_synapses = 0;
+			std::vector<Synapse> localSynapses;
+			std::vector<int> globalSynapse_xadj;
+			std::vector<int> globalSynapse_adjncy;
+			// count number of postsynaptic targets for each neuron
+			//std::vector<int> num_synapses(model.population_size,0);
+			for(int ii=0; ii < model.population_size; ii++) {
+				for(int jj=0; jj < model.interconnections_size[ii]; jj++) {
 					// ii -> presynaptic neuron; interconnections[ii][jj] --> postsynaptic neuron
-					// which population interconnections[ii][jj] belongs to
-					NeuronParams* c = NULL;
-					if(check_cell_params) {
-						for(int kk=0; kk < pops.size(); kk++) {
-							if(pops[kk]->is_in_population(postneuron)) {
-								c = pops[kk]->cell_params;
-								break;
+					// notify communicator
+					if(previous_neuron_activity[ii] > 0) // use previous activity info to determine if a link is going to become active
+						communicator->from_to_connection(ii,abs(model.interconnections[ii][jj]),parts);
+					if(parts[abs(model.interconnections[ii][jj])] == process_id) { 
+						//num_synapses[ii] += 1;
+						local_synapses++;
+					}
+				}
+			}
+			
+			if(!model.null_compute) {	
+				PRINTF("%i: Creating synapse objects and references\n",process_id);
+				localSynapses.resize(local_synapses); // all local synapses
+				int syn_count;
+				if(local_synapses > 0) { // if there are no local synapses, skip assigning memory for them
+					syn_count = 0;
+					bool check_cell_params = cell_params.size() > 1;
+					globalSynapse_xadj.resize(pop_size+1);
+					for(int ii=0; ii < pop_size; ii++) {
+						int conn_size = model.interconnections_size[ii];
+						int jj=0;
+						globalSynapse_xadj[ii] = syn_count;
+						//for(int* con = model.interconnections[ii], jj = 0; jj < conn_size; jj++,con++) {
+						for(int p=0; p < conn_size; p++) {
+							int postneuron = abs(model.interconnections[ii][p]);
+							// ii -> presynaptic neuron; interconnections[ii][jj] --> postsynaptic neuron
+							// which population interconnections[ii][jj] belongs to
+							NeuronParams* c = NULL;
+							if(check_cell_params) {
+								for(int kk=0; kk < pops.size(); kk++) {
+									if(pops[kk]->is_in_population(postneuron)) {
+										c = pops[kk]->cell_params;
+										break;
+									}
+								}
+							} else c = cell_params[0];
+							// weight and delay of the synapse calculated irrespective of whether synapse will reside in local process
+							// ensures identical network init across seeded sims
+							float weight = randgauss(c->w_exc_mean, c->w_exc_dev);
+							weight = weight < 0 ? 0 : weight;
+							float delay = 0;
+							bool isExcitatory = model.interconnections[ii][p] > 0;
+							if(!isExcitatory) {
+								weight *= c->w_inh_g;
+								delay = randgauss(c->inh_delay_mean, c->inh_delay_dev);
+							} else {
+								delay = randgauss(c->exc_delay_mean, c->exc_delay_dev);
+							}
+
+							delay = delay < 0 ? 0 : delay;
+
+							if(parts[postneuron] == process_id) { 
+								localSynapses[syn_count].init(ii, globalNeuronRefs[postneuron],isExcitatory,dt,c,k_scale,weight,delay);
+								syn_count++;
+							}
+							
+						}
+					}
+					globalSynapse_xadj[pop_size] = syn_count;
+					
+					
+					std::vector<int> indices(local_synapses);
+					for(int ii=0; ii < local_synapses; ii++) {
+						indices[ii] = ii;
+					}
+					std::sort(indices.begin(),indices.end(),IdxCompare(localSynapses));
+					// sorting by the postsynaptic neuron id is important
+					// to make the synapse update step faster (utilising mem cache)
+					std::sort(localSynapses.begin(),localSynapses.end()); // (fly brain) sort causes sim with seed 1516885998 to have different spike count (234138) as expected (234144)
+					
+					globalSynapse_adjncy.resize(local_synapses);
+					for(int ii = 0; ii < local_synapses; ii++) {
+						globalSynapse_adjncy[indices[ii]] = ii;
+					}
+				}
+
+				PRINTF("%i: Local synapses: %i\n",process_id,local_synapses);
+			}
+			
+			// clear unused model connection data
+			// relevant process-process dependencies are stored in communicator->neuron_connection_to
+			PRINTF("%i: Clearing local data\n",process_id);
+			if(iteration >= iterations-1){
+				for(int ii=0; ii < model.population_size; ii++) {
+					free(model.interconnections[ii]);		
+				}
+				free(model.interconnections_size);
+				free(model.interconnections);
+			}
+			//simulate
+			PRINTF("%i: Preparing start simulation...\n",process_id);
+			int numSpikes = 0;
+			int remote_spikes = 0;
+			int simSize = (int)(t_end / dt);
+
+			
+			//propagation objects
+			std::vector<unsigned int> propagate;
+			std::vector<int> fired;
+			std::vector<unsigned int> received;
+			
+			//monitoring objects
+			double* computation_times = (double*)calloc(simSize,sizeof(double));
+			if(computation_times == NULL) exit_error();
+			double* propagate_times = (double*)calloc(simSize,sizeof(double));
+			if(propagate_times == NULL) exit_error();
+			double* sync_time = (double*)calloc(simSize / propagation_time_step,sizeof(double));
+			if(sync_time == NULL) exit_error();
+			double* idle_time = (double*)calloc(simSize / propagation_time_step,sizeof(double));
+			if(idle_time == NULL) exit_error();
+			std::vector<std::vector<int> > neuron_activity; // monitor local neuron spike activity
+		#if defined(RECORD_STATISTICS) || defined(RECORD_ACTIVITY)
+			neuron_activity.resize(local_neurons);
+			// reserve memory to avoid reallocation during sim
+			for(int ii=0; ii < local_neurons; ii++) {
+				neuron_activity[ii].reserve(simSize);
+			}
+		#endif
+			
+			// trace where processes spend time on each timestep
+			int num_tracing_events = 7;
+			int num_traces = simSize * num_tracing_events + 1;
+			double* trace_timings = NULL;
+		#ifdef RECORD_PROCESS_TRACE
+			trace_timings = (double*)calloc(num_traces,sizeof(double));
+			if(trace_timings == NULL) exit_error();
+		#endif
+			
+			
+		#ifdef API_PROFILING
+			SCOREP_RECORDING_ON();
+		#endif
+
+
+			// final communicator setup
+			if(communicator != NULL) communicator->final_setup();
+			
+			PRINTF("%i: Waiting for other nodes\n",process_id);
+			
+			// synchronise all processes
+			MPI_Barrier(MPI_COMM_WORLD);
+			
+			// synchronise mpi time (with respect to MASTER_NODE time)
+			double process_time_correction = -MPI_Wtime();
+			PRINTF("%i: Start simulation. %f time correction\n",process_id,process_time_correction);
+			
+			double init_time;
+			timer = MPI_Wtime();
+			init_time = timer - global_timer;
+			global_timer = timer;
+			
+			// loop variables
+			int ii, jj, kk, t;
+			float current_t;
+			
+			for(t=0; t < simSize; t++) {
+			
+				timer = MPI_Wtime();
+		#ifdef RECORD_PROCESS_TRACE
+				trace_timings[t * num_tracing_events] = timer + process_time_correction;
+		#endif
+
+				current_t = dt * t;
+				
+		#ifdef API_PROFILING
+				SCOREP_USER_REGION_DEFINE(updateInjector_region);
+				SCOREP_USER_REGION_BEGIN(updateInjector_region,"updateInjectors", SCOREP_USER_REGION_TYPE_COMMON);
+		#endif
+				if(!model.null_compute) {
+					// update current from injectors
+					for(ii=0; ii < injections.size(); ii++) {
+						injections[ii]->update(current_t);
+						for(jj=0; jj < injections[ii]->size; jj++) { // SLOW!
+							for(kk=0; kk < injections[ii]->post_syn_neuron_idx[jj].size(); kk++) {
+								globalNeuronRefs[injections[ii]->post_syn_neuron_idx[jj][kk]]->i_e += (injections[ii]->i_e[jj]);
 							}
 						}
-					} else c = cell_params[0];
-					// weight and delay of the synapse calculated irrespective of whether synapse will reside in local process
-					// ensures identical network init across seeded sims
-					float weight = randgauss(c->w_exc_mean, c->w_exc_dev);
-					weight = weight < 0 ? 0 : weight;
-					float delay = 0;
-					bool isExcitatory = model.interconnections[ii][p] > 0;
-					if(!isExcitatory) {
-						weight *= c->w_inh_g;
-						delay = randgauss(c->inh_delay_mean, c->inh_delay_dev);
-					} else {
-						delay = randgauss(c->exc_delay_mean, c->exc_delay_dev);
-					}
-
-					delay = delay < 0 ? 0 : delay;
-
-					if(parts[postneuron] == process_id) { 
-						localSynapses[syn_count].init(ii, globalNeuronRefs[postneuron],isExcitatory,dt,c,k_scale,weight,delay);
-						syn_count++;
-					}
-					
-				}
-			}
-			globalSynapse_xadj[pop_size] = syn_count;
-			
-			
-			std::vector<int> indices(local_synapses);
-			for(int ii=0; ii < local_synapses; ii++) {
-				indices[ii] = ii;
-			}
-			std::sort(indices.begin(),indices.end(),IdxCompare(localSynapses));
-			// sorting by the postsynaptic neuron id is important
-			// to make the synapse update step faster (utilising mem cache)
-			std::sort(localSynapses.begin(),localSynapses.end()); // (fly brain) sort causes sim with seed 1516885998 to have different spike count (234138) as expected (234144)
-			
-			globalSynapse_adjncy.resize(local_synapses);
-			for(int ii = 0; ii < local_synapses; ii++) {
-				globalSynapse_adjncy[indices[ii]] = ii;
-			}
-		}
-
-		PRINTF("%i: Local synapses: %i\n",process_id,local_synapses);
-	}
-	
-	// clear unused model connection data
-	// relevant process-process dependencies are stored in communicator->neuron_connection_to
-	PRINTF("%i: Clearing local data\n",process_id);
-	for(int ii=0; ii < model.population_size; ii++) {
-	//	free(model.interconnections[ii]);		
-	}
-	//free(model.interconnections_size);
-	//free(model.interconnections);
-
-	//simulate
-	PRINTF("%i: Preparing start simulation...\n",process_id);
-	int numSpikes = 0;
-	int remote_spikes = 0;
-	int simSize = (int)(t_end / dt);
-
-	
-	//propagation objects
-	std::vector<unsigned int> propagate;
-	std::vector<int> fired;
-	std::vector<unsigned int> received;
-	
-	//monitoring objects
-	double* computation_times = (double*)calloc(simSize,sizeof(double));
-	if(computation_times == NULL) exit_error();
-	double* propagate_times = (double*)calloc(simSize,sizeof(double));
-	if(propagate_times == NULL) exit_error();
-	double* sync_time = (double*)calloc(simSize / propagation_time_step,sizeof(double));
-	if(sync_time == NULL) exit_error();
-	double* idle_time = (double*)calloc(simSize / propagation_time_step,sizeof(double));
-	if(idle_time == NULL) exit_error();
-	std::vector<std::vector<int> > neuron_activity; // monitor local neuron spike activity
-#if defined(RECORD_STATISTICS) || defined(RECORD_ACTIVITY)
-	neuron_activity.resize(local_neurons);
-	// reserve memory to avoid reallocation during sim
-	for(int ii=0; ii < local_neurons; ii++) {
-		neuron_activity[ii].reserve(simSize);
-	}
-#endif
-	
-	// trace where processes spend time on each timestep
-	int num_tracing_events = 7;
-	int num_traces = simSize * num_tracing_events + 1;
-	double* trace_timings = NULL;
-#ifdef RECORD_PROCESS_TRACE
-	trace_timings = (double*)calloc(num_traces,sizeof(double));
-	if(trace_timings == NULL) exit_error();
-#endif
-	
-	
-#ifdef API_PROFILING
-	SCOREP_RECORDING_ON();
-#endif
-
-
-	// final communicator setup
-	if(communicator != NULL) communicator->final_setup();
-	
-	PRINTF("%i: Waiting for other nodes\n",process_id);
-	
-	// synchronise all processes
-	MPI_Barrier(MPI_COMM_WORLD);
-	
-	// synchronise mpi time (with respect to MASTER_NODE time)
-	double process_time_correction = -MPI_Wtime();
-	PRINTF("%i: Start simulation. %f time correction\n",process_id,process_time_correction);
-	
-	double init_time;
-	timer = MPI_Wtime();
-	init_time = timer - global_timer;
-	global_timer = timer;
-	
-	// loop variables
-	int ii, jj, kk, t;
-	float current_t;
-	
-	for(t=0; t < simSize; t++) {
-	
-		timer = MPI_Wtime();
-#ifdef RECORD_PROCESS_TRACE
-		trace_timings[t * num_tracing_events] = timer + process_time_correction;
-#endif
-
-		current_t = dt * t;
-		
-#ifdef API_PROFILING
-		SCOREP_USER_REGION_DEFINE(updateInjector_region);
-		SCOREP_USER_REGION_BEGIN(updateInjector_region,"updateInjectors", SCOREP_USER_REGION_TYPE_COMMON);
-#endif
-		if(!model.null_compute) {
-			// update current from injectors
-			for(ii=0; ii < injections.size(); ii++) {
-				injections[ii]->update(current_t);
-				for(jj=0; jj < injections[ii]->size; jj++) { // SLOW!
-					for(kk=0; kk < injections[ii]->post_syn_neuron_idx[jj].size(); kk++) {
-						globalNeuronRefs[injections[ii]->post_syn_neuron_idx[jj][kk]]->i_e += (injections[ii]->i_e[jj]);
 					}
 				}
-			}
-		}
-		
-#ifdef API_PROFILING
-		SCOREP_USER_REGION_END(updateInjector_region);
-#endif
+				
+		#ifdef API_PROFILING
+				SCOREP_USER_REGION_END(updateInjector_region);
+		#endif
 
-#ifdef RECORD_PROCESS_TRACE
-		trace_timings[t * num_tracing_events+1] = MPI_Wtime() + process_time_correction;
-#endif
+		#ifdef RECORD_PROCESS_TRACE
+				trace_timings[t * num_tracing_events+1] = MPI_Wtime() + process_time_correction;
+		#endif
 
-#ifdef API_PROFILING
-		SCOREP_USER_REGION_DEFINE(updateLocalSynapses_region);
-		SCOREP_USER_REGION_BEGIN(updateLocalSynapses_region,"updateLocalSynapses", SCOREP_USER_REGION_TYPE_COMMON);
-#endif
-		
-		// update local synapses 
-		// storing local neuron references in a contiguous array saves each process
-		// from having to comb the entire g_synapses array
-		if(!model.null_compute) {
-			Synapse* syn;
-			for(syn = &localSynapses[0], ii=0; ii < local_synapses; ii++) {
-				syn->update_current(current_t);
-				syn++;
-			}
-		}
-		
-		
-#ifdef API_PROFILING
-		SCOREP_USER_REGION_END(updateLocalSynapses_region);
-#endif
-
-#ifdef RECORD_PROCESS_TRACE
-		trace_timings[t * num_tracing_events+2] = MPI_Wtime() + process_time_correction;
-#endif
-
-#ifdef API_PROFILING
-		SCOREP_USER_REGION_DEFINE(updateLocalNeuron_region);
-		SCOREP_USER_REGION_BEGIN(updateLocalNeuron_region,"updateLocalNeuron", SCOREP_USER_REGION_TYPE_COMMON);
-#endif
-		
-		// solve neuron state
-		fired.clear();
-		if(!model.null_compute) {
-			// storing local neuron references in a contiguous array saves each process
-			// from having to comb the entire neurons array and testing if local (most of which won't be local)
-			Neuron* neuron;
-			for(neuron = &localNeurons[0], ii=0; ii < local_neurons; ii++) {
-				if(neuron->update_potential(dt,current_t)) {
-					numSpikes++;
-					fired.push_back(neuron->id);
-#if defined(RECORD_STATISTICS) || defined(RECORD_ACTIVITY)
-					neuron_activity[ii].push_back(t);
-#endif
+		#ifdef API_PROFILING
+				SCOREP_USER_REGION_DEFINE(updateLocalSynapses_region);
+				SCOREP_USER_REGION_BEGIN(updateLocalSynapses_region,"updateLocalSynapses", SCOREP_USER_REGION_TYPE_COMMON);
+		#endif
+				
+				// update local synapses 
+				// storing local neuron references in a contiguous array saves each process
+				// from having to comb the entire g_synapses array
+				if(!model.null_compute) {
+					Synapse* syn;
+					for(syn = &localSynapses[0], ii=0; ii < local_synapses; ii++) {
+						syn->update_current(current_t);
+						syn++;
+					}
 				}
-				neuron++;
-			}
-		} else {
-			// no compute simulation, add all local neurons to propagation list
-			for(ii=0; ii < model.population_size; ii++) {
-				if(parts[ii] == process_id) {
-					fired.push_back(ii);
-					numSpikes++;
-				}
-			}
-		}
-		
-#ifdef API_PROFILING
-		SCOREP_USER_REGION_END(updateLocalNeuron_region);
-#endif
+				
+				
+		#ifdef API_PROFILING
+				SCOREP_USER_REGION_END(updateLocalSynapses_region);
+		#endif
 
-		computation_times[t] = MPI_Wtime() - timer;
-		timer = MPI_Wtime();
-#ifdef RECORD_PROCESS_TRACE
-		trace_timings[t * num_tracing_events+3] = timer + process_time_correction;
-#endif
+		#ifdef RECORD_PROCESS_TRACE
+				trace_timings[t * num_tracing_events+2] = MPI_Wtime() + process_time_correction;
+		#endif
 
-#ifdef API_PROFILING
-		SCOREP_USER_REGION_DEFINE(propagate_region);
-		SCOREP_USER_REGION_BEGIN(propagate_region,"propagate", SCOREP_USER_REGION_TYPE_COMMON);
-#endif	
-
-		// gather spikes
-		received.clear();
-		for(ii=0; ii < fired.size(); ii++) {
-			int preneuron = fired[ii];
-			if(!model.null_compute) {
-				//first go through local targets
-				if(globalSynapse_xadj[preneuron] < globalSynapse_xadj[preneuron+1]) {
-					received.push_back(encodeSpike(0,preneuron));
-				}
-			}
-			// check if pre-synaptic firing neuron has any listener partitions
-			if(communicator->neuron_connection_to[preneuron].size() > 0) {
-				remote_spikes++;
-				// add to propagate the time of spiking and neuron id
-				// how many timesteps until the next propagation_time_step
-				propagate.push_back(encodeSpike(propagation_time_step - (t % propagation_time_step) - 1,preneuron));
-			}
-		}
-
-		// only propagate every propagation_time_step
-		if((t+1) % propagation_time_step == 0) {
-			// even though communicator->send_receive already coordinates processes
-			// processes that may not communicate on one time step may need to do so in the next
-			// if no barrier, then they may go out of sync
-			double sub_t;
-#ifdef RECORD_PROCESS_TRACE
-			trace_timings[t * num_tracing_events+4] = MPI_Wtime() + process_time_correction;
-#endif
-#ifdef MEASURE_IDLE_TIME
-			// Calling MPI_Barrier can improve performance by reducing network contention
-			sub_t = MPI_Wtime();
-			MPI_Barrier(MPI_COMM_WORLD);
-			idle_time[(t+1) / propagation_time_step - 1] = MPI_Wtime() - sub_t;
-			
-#endif
-			// disseminate spikes across processes
-			sub_t = MPI_Wtime();
-#ifdef RECORD_PROCESS_TRACE
-			trace_timings[t * num_tracing_events+5] = sub_t + process_time_correction;
-#endif
-			//communicator->send_receive(&propagate, parts, &(model.connections), &received);
-			communicator->send_receive(&propagate, &received);
-			sync_time[(t+1) / propagation_time_step - 1] = MPI_Wtime() - sub_t;
-			propagate.clear();
-
-#ifdef MEASURE_IDLE_TIME
-			// this barrier is necessary to avoid imbalance from send_receive to spill over to idle time
-			// Or not. MPI_Barrier syncs order of events, but does not ensure process are in timed synced
-			// Processes reaching barrier first send message to all others and wait
-			// Last processes to reach would acknowledge and continue; and send message to all others
-			// The processes arriving to the barrier first will wait for the messages to arrive from slower processes
-			// By the time they receive the messages, the system is likely to be imbalanced again
-			// Suggested: Use Simple Time Protocol to sync in time
-			// https://www.techopedia.com/definition/4539/simple-network-time-protocol-sntp
-			//MPI_Barrier(MPI_COMM_WORLD);
-#endif
-			
-		} else {
-#ifdef RECORD_PROCESS_TRACE
-			// still record tracing timings
-			double timing = MPI_Wtime();
-			trace_timings[t * num_tracing_events+4] = timing + process_time_correction;
-			trace_timings[t * num_tracing_events+5] = timing + process_time_correction;
-#endif
-		}
-		
-			
-#ifdef API_PROFILING
-		SCOREP_USER_REGION_END(propagate_region);
-#endif
-		
-		propagate_times[t] = MPI_Wtime() - timer;// measure time the process was propagating spikes
-		
-		timer = MPI_Wtime();
-#ifdef RECORD_PROCESS_TRACE
-		trace_timings[t * num_tracing_events+6] = timer + process_time_correction;
-#endif
-
-#ifdef API_PROFILING
-		SCOREP_USER_REGION_DEFINE(updateSynapse_region);
-		SCOREP_USER_REGION_BEGIN(updateSynapse_region,"updateSynapse", SCOREP_USER_REGION_TYPE_COMMON);
-#endif
-		if(!model.null_compute) {
-			// update synapses
-			for(ii=0; ii < received.size(); ii++) {
-				// decode neuron id and spike timing
-				int preneuron;
-				int spike_timing;
-				decodeSpike(received[ii],&spike_timing,&preneuron);
-				for(jj=globalSynapse_xadj[preneuron]; jj < globalSynapse_xadj[preneuron+1]; jj++) {
-					localSynapses[globalSynapse_adjncy[jj]].spike(spike_timing);
-				}
-			}
-		}
-		
-		
-		
-#ifdef API_PROFILING
-		SCOREP_USER_REGION_END(updateSynapse_region);
-#endif	
-		computation_times[t] += MPI_Wtime() - timer; // add update synapse computing times to neuron and synapse update 		
-		
-		
-	}
-#ifdef RECORD_PROCESS_TRACE
-	trace_timings[simSize * num_tracing_events] = MPI_Wtime() + process_time_correction;
-#endif
-
-	double sim_time;
-	timer = MPI_Wtime();
-	sim_time = timer - global_timer;
-	global_timer = timer;
-	
-#ifdef API_PROFILING
-	SCOREP_USER_REGION_DEFINE(gather_region);
-	SCOREP_USER_REGION_BEGIN(gather_region,"gatherInfo", SCOREP_USER_REGION_TYPE_COMMON);
-#endif
-
-	// gather info from processes (spikes and timings)
-	PRINTF("End simulation. Start gathering results...\n");
-
-	int total_spikes;
-	MPI_Allreduce(&numSpikes, &total_spikes, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
-	int total_remote_spikes;
-	MPI_Allreduce(&remote_spikes, &total_remote_spikes, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
-	
-	double comptime = 0;
-	double proptime = 0;
-	double idletime = 0;
-	double synctime = 0;
-	for(ii = 0; ii < simSize; ii++) {
-		comptime += computation_times[ii];
-		proptime += propagate_times[ii];
-		if(ii < simSize / propagation_time_step) {
-			idletime += idle_time[ii];
-			synctime += sync_time[ii];
-		}
-	}
-	
-	std::vector<std::vector<double> > total_traces;
-#ifdef RECORD_PROCESS_TRACE
-	// share trace timings per process //
-	if(process_id != MASTER_NODE) {
-		// send traces ti MASTER_NODE
-		MPI_Send(trace_timings,num_traces, MPI_DOUBLE,MASTER_NODE,process_id,MPI_COMM_WORLD);
-	} else {
-		total_traces.resize(num_processes);
-		// receive one trace per process
-		double* buf = (double*)malloc(sizeof(double) * num_traces);
-		for(ii=0; ii < num_processes; ii++) {
-			if(ii == MASTER_NODE) {
-				// collect MASTER_NODE data too
-				for(jj=0; jj < num_traces; jj++) {
-					total_traces[ii].push_back(trace_timings[jj]);
-				}
-			} else {
-				MPI_Recv(buf, num_traces, MPI_DOUBLE, ii, MPI_ANY_TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-				for(jj=0; jj < num_traces; jj++) {
-					total_traces[ii].push_back(buf[jj]);
-				}
-			}
-		}
-		free(buf);
-	}
-	////
-#endif
-
-	/* variability in timings throughout simulation */
-	double comp_variance = 0;
-	double idle_variance = 0;
-	double sync_variance = 0;
-	for(ii = 0; ii < simSize; ii++) {
-		comp_variance += (computation_times[ii] - comptime/simSize) * (computation_times[ii] - comptime/simSize);
-		if(ii < simSize / propagation_time_step) {
-			idle_variance += (idle_time[ii] - (idletime/(simSize/propagation_time_step))) * (idle_time[ii] - (idletime/(simSize/propagation_time_step)));
-			sync_variance += (sync_time[ii] - (synctime/(simSize/propagation_time_step))) * (sync_time[ii] - (synctime/(simSize/propagation_time_step)));
-		}
-	}
-	comp_variance = sqrt(comp_variance / simSize);
-	idle_variance = sqrt(idle_variance / (simSize / propagation_time_step));
-	sync_variance = sqrt(sync_variance / (simSize / propagation_time_step));
-
-	// Runtime neighbours during simulation
-	long int* runtime_neighbours = (long int*)malloc(sizeof(long int) * num_processes);
-	MPI_Gather(&communicator->runtime_neighbours,1,MPI_LONG,runtime_neighbours,1,MPI_LONG,MASTER_NODE,MPI_COMM_WORLD);
-	int* non_empty_comm_steps = (int*)malloc(sizeof(int) * num_processes);
-	MPI_Gather(&communicator->non_empty_comm_step,1,MPI_INT,non_empty_comm_steps,1,MPI_INT,MASTER_NODE,MPI_COMM_WORLD);
-	long int total_runtime_neighbours = 0;
-	int total_non_empty_comm_steps = 0;
-	for(ii=0; ii < num_processes; ii++){
-		total_runtime_neighbours += runtime_neighbours[ii];
-		total_non_empty_comm_steps += non_empty_comm_steps[ii];
-	}
-	float average_runtime_neighbours = (float)total_runtime_neighbours / num_processes / (num_processes-1) / communicator->comm_step;
-	float average_non_empty_runtime_neighbours = total_non_empty_comm_steps == 0 ? 0 : (float)total_runtime_neighbours / (num_processes-1) / total_non_empty_comm_steps;
-	
-	int total_sync_group_size;
-	int sync_group_size = communicator->get_sync_group_size();
-	MPI_Allreduce(&sync_group_size, &total_sync_group_size, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
-	double avg_sync_group_size = (double)total_sync_group_size / num_processes / (num_processes-1);
-	double* sim_times = (double*)malloc(sizeof(double) * num_processes);
-	MPI_Gather(&sim_time,1,MPI_DOUBLE,sim_times,1,MPI_DOUBLE,MASTER_NODE,MPI_COMM_WORLD);
-	double* comp_times = (double*)malloc(sizeof(double) * num_processes);
-	MPI_Gather(&comptime,1,MPI_DOUBLE,comp_times,1,MPI_DOUBLE,MASTER_NODE,MPI_COMM_WORLD);
-	double* idle_times = (double*)malloc(sizeof(double) * num_processes);
-	MPI_Gather(&idletime,1,MPI_DOUBLE,idle_times,1,MPI_DOUBLE,MASTER_NODE,MPI_COMM_WORLD);
-	//int* total_local_synapses = (int*)malloc(sizeof(int)*num_processes);
-	//MPI_Gather(&local_synapses,1,MPI_INT,total_local_synapses,1,MPI_INT,MASTER_NODE,MPI_COMM_WORLD);
-	//double total_synapse_comp_imbalance;
-	//MPI_Allreduce(&synapse_comp_imbalance, &total_synapse_comp_imbalance, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-	double* p_times = (double*)malloc(sizeof(double) * num_processes);
-	MPI_Gather(&proptime,1,MPI_DOUBLE,p_times,1,MPI_DOUBLE,MASTER_NODE,MPI_COMM_WORLD);
-	long int* comm_sent = (long int*)malloc(sizeof(long int) * num_processes);
-	MPI_Gather(&communicator->communication_sent,1,MPI_LONG,comm_sent,1,MPI_LONG,MASTER_NODE,MPI_COMM_WORLD);
-	double* s_times = (double*)malloc(sizeof(double) * num_processes);
-	MPI_Gather(&synctime,1,MPI_DOUBLE,s_times,1,MPI_DOUBLE,MASTER_NODE,MPI_COMM_WORLD);
-	long int messages_sent;
-	MPI_Allreduce(&communicator->num_messages, &messages_sent, 1, MPI_LONG, MPI_SUM, MPI_COMM_WORLD);
-	long int total_interprocess_spikes;
-	MPI_Allreduce(&(communicator->spikes_sent), &total_interprocess_spikes, 1, MPI_LONG, MPI_SUM, MPI_COMM_WORLD);
-	double* comp_variances = (double*)malloc(sizeof(double) * num_processes);
-	MPI_Gather(&comp_variance,1,MPI_DOUBLE,comp_variances,1,MPI_DOUBLE,MASTER_NODE,MPI_COMM_WORLD);
-	double* idle_variances = (double*)malloc(sizeof(double) * num_processes);
-	MPI_Gather(&idle_variance,1,MPI_DOUBLE,idle_variances,1,MPI_DOUBLE,MASTER_NODE,MPI_COMM_WORLD);
-	double* sync_variances = (double*)malloc(sizeof(double) * num_processes);
-	MPI_Gather(&sync_variance,1,MPI_DOUBLE,sync_variances,1,MPI_DOUBLE,MASTER_NODE,MPI_COMM_WORLD);
-	
-	std::vector<std::vector<int> > global_activity;
-	
-#if defined(RECORD_STATISTICS) || defined(RECORD_ACTIVITY)
-	// Share neuron activity record with master node
-	if(process_id != MASTER_NODE) {
-		// send neuron_activity to MASTER_NODE
-		for(ii = 0; ii < neuron_activity.size(); ii++) {
-			if(neuron_activity[ii].size() == 0) continue;
-			int gid = localNeurons[ii].id;
-			MPI_Send(&neuron_activity[ii][0],neuron_activity[ii].size(),MPI_INT,MASTER_NODE,gid,MPI_COMM_WORLD);
-		}
-		// finished message
-		MPI_Send(MPI_BOTTOM,0,MPI_INT,MASTER_NODE,model.population_size,MPI_COMM_WORLD);
-	} else {
-		global_activity.resize(model.population_size);
-		// add local activity
-		for(ii=0; ii < local_neurons; ii++) {
-			int gid = localNeurons[ii].id;
-			for(jj=0; jj < neuron_activity[ii].size(); jj++) {
-				global_activity[gid].push_back(neuron_activity[ii][jj]);
-			}
-		}
-		// receive neuron_activity from all nodes
-		for(ii=0; ii < num_processes; ii++) {
-			if(ii == MASTER_NODE) continue;
-			bool listen = true;
-			MPI_Status status;
-			int count;
-			do {
-				MPI_Probe(ii,MPI_ANY_TAG,MPI_COMM_WORLD,&status);
-				MPI_Get_count(&status, MPI_INT, &count);
-				if(status.MPI_TAG == model.population_size) {
-					// termination message, receive and ignore
-					int ignore;
-					MPI_Recv(&ignore, 0, MPI_INT, ii, status.MPI_TAG,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
-					listen = false;
+		#ifdef API_PROFILING
+				SCOREP_USER_REGION_DEFINE(updateLocalNeuron_region);
+				SCOREP_USER_REGION_BEGIN(updateLocalNeuron_region,"updateLocalNeuron", SCOREP_USER_REGION_TYPE_COMMON);
+		#endif
+				
+				// solve neuron state
+				fired.clear();
+				if(!model.null_compute) {
+					// storing local neuron references in a contiguous array saves each process
+					// from having to comb the entire neurons array and testing if local (most of which won't be local)
+					Neuron* neuron;
+					for(neuron = &localNeurons[0], ii=0; ii < local_neurons; ii++) {
+						if(neuron->update_potential(dt,current_t)) {
+							numSpikes++;
+							fired.push_back(neuron->id);
+		#if defined(RECORD_STATISTICS) || defined(RECORD_ACTIVITY)
+							neuron_activity[ii].push_back(t);
+		#endif
+						}
+						neuron++;
+					}
 				} else {
-					// receive activity series for neuron status.MPI_TAG
+					// no compute simulation, add all local neurons to propagation list
+					for(ii=0; ii < model.population_size; ii++) {
+						if(parts[ii] == process_id) {
+							fired.push_back(ii);
+							numSpikes++;
+						}
+					}
+				}
+				
+		#ifdef API_PROFILING
+				SCOREP_USER_REGION_END(updateLocalNeuron_region);
+		#endif
+
+				computation_times[t] = MPI_Wtime() - timer;
+				timer = MPI_Wtime();
+		#ifdef RECORD_PROCESS_TRACE
+				trace_timings[t * num_tracing_events+3] = timer + process_time_correction;
+		#endif
+
+		#ifdef API_PROFILING
+				SCOREP_USER_REGION_DEFINE(propagate_region);
+				SCOREP_USER_REGION_BEGIN(propagate_region,"propagate", SCOREP_USER_REGION_TYPE_COMMON);
+		#endif	
+
+				// gather spikes
+				received.clear();
+				for(ii=0; ii < fired.size(); ii++) {
+					int preneuron = fired[ii];
+					if(!model.null_compute) {
+						//first go through local targets
+						if(globalSynapse_xadj[preneuron] < globalSynapse_xadj[preneuron+1]) {
+							received.push_back(encodeSpike(0,preneuron));
+						}
+					}
+					// check if pre-synaptic firing neuron has any listener partitions
+					if(communicator->neuron_connection_to[preneuron].size() > 0) {
+						remote_spikes++;
+						// add to propagate the time of spiking and neuron id
+						// how many timesteps until the next propagation_time_step
+						propagate.push_back(encodeSpike(propagation_time_step - (t % propagation_time_step) - 1,preneuron));
+					}
+				}
+
+				// only propagate every propagation_time_step
+				if((t+1) % propagation_time_step == 0) {
+					// even though communicator->send_receive already coordinates processes
+					// processes that may not communicate on one time step may need to do so in the next
+					// if no barrier, then they may go out of sync
+					double sub_t;
+		#ifdef RECORD_PROCESS_TRACE
+					trace_timings[t * num_tracing_events+4] = MPI_Wtime() + process_time_correction;
+		#endif
+		#ifdef MEASURE_IDLE_TIME
+					// Calling MPI_Barrier can improve performance by reducing network contention
+					sub_t = MPI_Wtime();
+					MPI_Barrier(MPI_COMM_WORLD);
+					idle_time[(t+1) / propagation_time_step - 1] = MPI_Wtime() - sub_t;
+					
+		#endif
+					// disseminate spikes across processes
+					sub_t = MPI_Wtime();
+		#ifdef RECORD_PROCESS_TRACE
+					trace_timings[t * num_tracing_events+5] = sub_t + process_time_correction;
+		#endif
+					//communicator->send_receive(&propagate, parts, &(model.connections), &received);
+					communicator->send_receive(&propagate, &received);
+					sync_time[(t+1) / propagation_time_step - 1] = MPI_Wtime() - sub_t;
+					propagate.clear();
+
+		#ifdef MEASURE_IDLE_TIME
+					// this barrier is necessary to avoid imbalance from send_receive to spill over to idle time
+					// Or not. MPI_Barrier syncs order of events, but does not ensure process are in timed synced
+					// Processes reaching barrier first send message to all others and wait
+					// Last processes to reach would acknowledge and continue; and send message to all others
+					// The processes arriving to the barrier first will wait for the messages to arrive from slower processes
+					// By the time they receive the messages, the system is likely to be imbalanced again
+					// Suggested: Use Simple Time Protocol to sync in time
+					// https://www.techopedia.com/definition/4539/simple-network-time-protocol-sntp
+					//MPI_Barrier(MPI_COMM_WORLD);
+		#endif
+					
+				} else {
+		#ifdef RECORD_PROCESS_TRACE
+					// still record tracing timings
+					double timing = MPI_Wtime();
+					trace_timings[t * num_tracing_events+4] = timing + process_time_correction;
+					trace_timings[t * num_tracing_events+5] = timing + process_time_correction;
+		#endif
+				}
+				
+					
+		#ifdef API_PROFILING
+				SCOREP_USER_REGION_END(propagate_region);
+		#endif
+				
+				propagate_times[t] = MPI_Wtime() - timer;// measure time the process was propagating spikes
+				
+				timer = MPI_Wtime();
+		#ifdef RECORD_PROCESS_TRACE
+				trace_timings[t * num_tracing_events+6] = timer + process_time_correction;
+		#endif
+
+		#ifdef API_PROFILING
+				SCOREP_USER_REGION_DEFINE(updateSynapse_region);
+				SCOREP_USER_REGION_BEGIN(updateSynapse_region,"updateSynapse", SCOREP_USER_REGION_TYPE_COMMON);
+		#endif
+				if(!model.null_compute) {
+					// update synapses
+					for(ii=0; ii < received.size(); ii++) {
+						// decode neuron id and spike timing
+						int preneuron;
+						int spike_timing;
+						decodeSpike(received[ii],&spike_timing,&preneuron);
+						for(jj=globalSynapse_xadj[preneuron]; jj < globalSynapse_xadj[preneuron+1]; jj++) {
+							localSynapses[globalSynapse_adjncy[jj]].spike(spike_timing);
+						}
+					}
+				}
+				
+				
+				
+		#ifdef API_PROFILING
+				SCOREP_USER_REGION_END(updateSynapse_region);
+		#endif	
+				computation_times[t] += MPI_Wtime() - timer; // add update synapse computing times to neuron and synapse update 		
+				
+				
+			}
+		#ifdef RECORD_PROCESS_TRACE
+			trace_timings[simSize * num_tracing_events] = MPI_Wtime() + process_time_correction;
+		#endif
+
+			double sim_time;
+			timer = MPI_Wtime();
+			sim_time = timer - global_timer;
+			global_timer = timer;
+			
+		#ifdef API_PROFILING
+			SCOREP_USER_REGION_DEFINE(gather_region);
+			SCOREP_USER_REGION_BEGIN(gather_region,"gatherInfo", SCOREP_USER_REGION_TYPE_COMMON);
+		#endif
+
+			// gather info from processes (spikes and timings)
+			PRINTF("End simulation. Start gathering results...\n");
+
+			int total_spikes;
+			MPI_Allreduce(&numSpikes, &total_spikes, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+			int total_remote_spikes;
+			MPI_Allreduce(&remote_spikes, &total_remote_spikes, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+			
+			double comptime = 0;
+			double proptime = 0;
+			double idletime = 0;
+			double synctime = 0;
+			for(ii = 0; ii < simSize; ii++) {
+				comptime += computation_times[ii];
+				proptime += propagate_times[ii];
+				if(ii < simSize / propagation_time_step) {
+					idletime += idle_time[ii];
+					synctime += sync_time[ii];
+				}
+			}
+			
+			std::vector<std::vector<double> > total_traces;
+		#ifdef RECORD_PROCESS_TRACE
+			// share trace timings per process //
+			if(process_id != MASTER_NODE) {
+				// send traces ti MASTER_NODE
+				MPI_Send(trace_timings,num_traces, MPI_DOUBLE,MASTER_NODE,process_id,MPI_COMM_WORLD);
+			} else {
+				total_traces.resize(num_processes);
+				// receive one trace per process
+				double* buf = (double*)malloc(sizeof(double) * num_traces);
+				for(ii=0; ii < num_processes; ii++) {
+					if(ii == MASTER_NODE) {
+						// collect MASTER_NODE data too
+						for(jj=0; jj < num_traces; jj++) {
+							total_traces[ii].push_back(trace_timings[jj]);
+						}
+					} else {
+						MPI_Recv(buf, num_traces, MPI_DOUBLE, ii, MPI_ANY_TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+						for(jj=0; jj < num_traces; jj++) {
+							total_traces[ii].push_back(buf[jj]);
+						}
+					}
+				}
+				free(buf);
+			}
+			////
+		#endif
+
+			/* variability in timings throughout simulation */
+			double comp_variance = 0;
+			double idle_variance = 0;
+			double sync_variance = 0;
+			for(ii = 0; ii < simSize; ii++) {
+				comp_variance += (computation_times[ii] - comptime/simSize) * (computation_times[ii] - comptime/simSize);
+				if(ii < simSize / propagation_time_step) {
+					idle_variance += (idle_time[ii] - (idletime/(simSize/propagation_time_step))) * (idle_time[ii] - (idletime/(simSize/propagation_time_step)));
+					sync_variance += (sync_time[ii] - (synctime/(simSize/propagation_time_step))) * (sync_time[ii] - (synctime/(simSize/propagation_time_step)));
+				}
+			}
+			comp_variance = sqrt(comp_variance / simSize);
+			idle_variance = sqrt(idle_variance / (simSize / propagation_time_step));
+			sync_variance = sqrt(sync_variance / (simSize / propagation_time_step));
+
+			// Runtime neighbours during simulation
+			long int* runtime_neighbours = (long int*)malloc(sizeof(long int) * num_processes);
+			MPI_Gather(&communicator->runtime_neighbours,1,MPI_LONG,runtime_neighbours,1,MPI_LONG,MASTER_NODE,MPI_COMM_WORLD);
+			int* non_empty_comm_steps = (int*)malloc(sizeof(int) * num_processes);
+			MPI_Gather(&communicator->non_empty_comm_step,1,MPI_INT,non_empty_comm_steps,1,MPI_INT,MASTER_NODE,MPI_COMM_WORLD);
+			long int total_runtime_neighbours = 0;
+			int total_non_empty_comm_steps = 0;
+			for(ii=0; ii < num_processes; ii++){
+				total_runtime_neighbours += runtime_neighbours[ii];
+				total_non_empty_comm_steps += non_empty_comm_steps[ii];
+			}
+			float average_runtime_neighbours = (float)total_runtime_neighbours / num_processes / (num_processes-1) / communicator->comm_step;
+			float average_non_empty_runtime_neighbours = total_non_empty_comm_steps == 0 ? 0 : (float)total_runtime_neighbours / (num_processes-1) / total_non_empty_comm_steps;
+			
+			int total_sync_group_size;
+			int sync_group_size = communicator->get_sync_group_size();
+			MPI_Allreduce(&sync_group_size, &total_sync_group_size, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+			double avg_sync_group_size = (double)total_sync_group_size / num_processes / (num_processes-1);
+			double* sim_times = (double*)malloc(sizeof(double) * num_processes);
+			MPI_Gather(&sim_time,1,MPI_DOUBLE,sim_times,1,MPI_DOUBLE,MASTER_NODE,MPI_COMM_WORLD);
+			double* comp_times = (double*)malloc(sizeof(double) * num_processes);
+			MPI_Gather(&comptime,1,MPI_DOUBLE,comp_times,1,MPI_DOUBLE,MASTER_NODE,MPI_COMM_WORLD);
+			double* idle_times = (double*)malloc(sizeof(double) * num_processes);
+			MPI_Gather(&idletime,1,MPI_DOUBLE,idle_times,1,MPI_DOUBLE,MASTER_NODE,MPI_COMM_WORLD);
+			//int* total_local_synapses = (int*)malloc(sizeof(int)*num_processes);
+			//MPI_Gather(&local_synapses,1,MPI_INT,total_local_synapses,1,MPI_INT,MASTER_NODE,MPI_COMM_WORLD);
+			//double total_synapse_comp_imbalance;
+			//MPI_Allreduce(&synapse_comp_imbalance, &total_synapse_comp_imbalance, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+			double* p_times = (double*)malloc(sizeof(double) * num_processes);
+			MPI_Gather(&proptime,1,MPI_DOUBLE,p_times,1,MPI_DOUBLE,MASTER_NODE,MPI_COMM_WORLD);
+			long int* comm_sent = (long int*)malloc(sizeof(long int) * num_processes);
+			MPI_Gather(&communicator->communication_sent,1,MPI_LONG,comm_sent,1,MPI_LONG,MASTER_NODE,MPI_COMM_WORLD);
+			double* s_times = (double*)malloc(sizeof(double) * num_processes);
+			MPI_Gather(&synctime,1,MPI_DOUBLE,s_times,1,MPI_DOUBLE,MASTER_NODE,MPI_COMM_WORLD);
+			long int messages_sent;
+			MPI_Allreduce(&communicator->num_messages, &messages_sent, 1, MPI_LONG, MPI_SUM, MPI_COMM_WORLD);
+			long int total_interprocess_spikes;
+			MPI_Allreduce(&(communicator->spikes_sent), &total_interprocess_spikes, 1, MPI_LONG, MPI_SUM, MPI_COMM_WORLD);
+			double* comp_variances = (double*)malloc(sizeof(double) * num_processes);
+			MPI_Gather(&comp_variance,1,MPI_DOUBLE,comp_variances,1,MPI_DOUBLE,MASTER_NODE,MPI_COMM_WORLD);
+			double* idle_variances = (double*)malloc(sizeof(double) * num_processes);
+			MPI_Gather(&idle_variance,1,MPI_DOUBLE,idle_variances,1,MPI_DOUBLE,MASTER_NODE,MPI_COMM_WORLD);
+			double* sync_variances = (double*)malloc(sizeof(double) * num_processes);
+			MPI_Gather(&sync_variance,1,MPI_DOUBLE,sync_variances,1,MPI_DOUBLE,MASTER_NODE,MPI_COMM_WORLD);
+			
+			std::vector<std::vector<int> > global_activity;
+			
+		#if defined(RECORD_STATISTICS) || defined(RECORD_ACTIVITY)
+			// Share neuron activity record with master node
+			if(process_id != MASTER_NODE) {
+				// send neuron_activity to MASTER_NODE
+				for(ii = 0; ii < neuron_activity.size(); ii++) {
+					if(neuron_activity[ii].size() == 0) continue;
+					int gid = localNeurons[ii].id;
+					MPI_Send(&neuron_activity[ii][0],neuron_activity[ii].size(),MPI_INT,MASTER_NODE,gid,MPI_COMM_WORLD);
+				}
+				// finished message
+				MPI_Send(MPI_BOTTOM,0,MPI_INT,MASTER_NODE,model.population_size,MPI_COMM_WORLD);
+			} else {
+				global_activity.resize(model.population_size);
+				// add local activity
+				for(ii=0; ii < local_neurons; ii++) {
+					int gid = localNeurons[ii].id;
+					for(jj=0; jj < neuron_activity[ii].size(); jj++) {
+						global_activity[gid].push_back(neuron_activity[ii][jj]);
+					}
+				}
+				// receive neuron_activity from all nodes
+				for(ii=0; ii < num_processes; ii++) {
+					if(ii == MASTER_NODE) continue;
+					bool listen = true;
+					MPI_Status status;
+					int count;
+					do {
+						MPI_Probe(ii,MPI_ANY_TAG,MPI_COMM_WORLD,&status);
+						MPI_Get_count(&status, MPI_INT, &count);
+						if(status.MPI_TAG == model.population_size) {
+							// termination message, receive and ignore
+							int ignore;
+							MPI_Recv(&ignore, 0, MPI_INT, ii, status.MPI_TAG,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
+							listen = false;
+						} else {
+							// receive activity series for neuron status.MPI_TAG
+							int* buffer = (int*)malloc(sizeof(int) * count);
+							MPI_Recv(buffer, count, MPI_INT, ii, status.MPI_TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+							for(int ss=0; ss < count; ss++) {
+								global_activity[status.MPI_TAG].push_back(buffer[ss]);
+							}
+							free(buffer);
+						}
+						
+					} while(listen);
+				}
+			}
+			
+		#endif	
+
+		#if defined(ADVANCED_COMM_STATS) || defined(ADVANCED_COMM_STATS_MATRIX_ONLY)
+			// store advanced communication stats (weight of each message)
+			// EXPERIMENT_NAME_comm_sizes_NUM_PROCESSES will contain sizes of all messages (from all processes)
+			// EXPERIMENT_NAME_comm_matrix_NUM_PROCESSES will contain table with total comm between any two processes
+			if(process_id == MASTER_NODE) {
+				std::string filename = sim_name;
+				filename += "_";
+				filename += part_method;
+				filename += "_";
+				filename += comm_method;
+				char str_int[16];
+				sprintf(str_int,"%i",num_processes);
+				filename += "_comm_sizes_";
+				filename +=  str_int;
+				FILE *fp;
+		#ifndef ADVANCED_COMM_STATS_MATRIX_ONLY
+				fp = fopen(filename.c_str(), "w+");
+		#endif
+				MPI_Status status;
+				int count;
+				// store values for MASTER_NODE first
+				int* current_comm_matrix = (int*)calloc(num_processes,sizeof(int));
+				for(ii=0; ii < communicator->messages_sent.size(); ii++) {
+					int total = 0;
+					for(int p=0; p < communicator->messages_sent[ii].size(); p++) {
+						total += communicator->messages_sent[ii][p];
+		#ifndef ADVANCED_COMM_STATS_MATRIX_ONLY
+						fprintf(fp,"%i ",communicator->messages_sent[ii][p]);
+		#endif
+					}
+					current_comm_matrix[ii] = total;
+					communicator->messages_sent[ii].clear();
+					communicator->messages_sent[ii].swap(communicator->messages_sent[ii]);
+				}
+		#ifndef ADVANCED_COMM_STATS_MATRIX_ONLY
+				// collect message values from other nodes
+				for(ii=0; ii < num_processes; ii++) {
+					if(ii == MASTER_NODE) continue;
+					MPI_Probe(ii,MPI_ANY_TAG,MPI_COMM_WORLD,&status);
+					MPI_Get_count(&status, MPI_INT, &count);
 					int* buffer = (int*)malloc(sizeof(int) * count);
-					MPI_Recv(buffer, count, MPI_INT, ii, status.MPI_TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+					MPI_Recv(buffer, count, MPI_INT, ii, MPI_ANY_TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 					for(int ss=0; ss < count; ss++) {
-						global_activity[status.MPI_TAG].push_back(buffer[ss]);
+						// write each value to a file
+						fprintf(fp,"%i ",buffer[ss]);
 					}
 					free(buffer);
 				}
+				fprintf(fp,"\n");
+				fclose(fp);
+
+				MPI_Barrier(MPI_COMM_WORLD); // make sure first communication batch is completed
+		#endif
+				// collect total values from other processes (comm matrix)
+				filename = sim_name;
+				filename += "_";
+				filename += part_method;
+				filename += "_";
+				filename += comm_method;
+				filename += "_comm_matrix_";
+				filename +=  str_int;
+				fp = fopen(filename.c_str(), "w+");
+				// store MASTER_NODE local values first
+				for(ii=0; ii < num_processes; ii++) {
+					fprintf(fp,"%i ",current_comm_matrix[ii]);
+				}
+				fprintf(fp,"\n");
+				// collect message values from other nodes
+				for(ii=0; ii < num_processes; ii++) {
+					if(ii == MASTER_NODE) continue;
+					MPI_Probe(ii,MPI_ANY_TAG,MPI_COMM_WORLD,&status);
+					MPI_Get_count(&status, MPI_INT, &count);
+					int* buffer = (int*)malloc(sizeof(int) * count);
+					MPI_Recv(buffer, count, MPI_INT, ii, MPI_ANY_TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+					for(int ss=0; ss < count; ss++) {
+						// write each value to a file
+						fprintf(fp,"%i ",buffer[ss]);
+					}
+					fprintf(fp,"\n");
+					free(buffer);
+				}
+
+				free(current_comm_matrix);
+				fclose(fp);
+			} else {
+				std::vector<int> flatten;
+				int* current_comm_matrix = (int*)calloc(num_processes,sizeof(int));
+				for(ii=0; ii < communicator->messages_sent.size(); ii++) {
+					int total = 0;
+					for(int p=0; p < communicator->messages_sent[ii].size(); p++) {
+						total += communicator->messages_sent[ii][p];
+						flatten.push_back(communicator->messages_sent[ii][p]);
+					}
+					current_comm_matrix[ii] = total;
+					communicator->messages_sent[ii].clear();
+					communicator->messages_sent[ii].swap(communicator->messages_sent[ii]);
+				}
+		#ifndef ADVANCED_COMM_STATS_MATRIX_ONLY
+				int* buf;
+				if(flatten.size() > 0)
+					buf = &flatten[0];
+				MPI_Send(buf,flatten.size(),MPI_INT,MASTER_NODE,process_id,MPI_COMM_WORLD);
+
+				MPI_Barrier(MPI_COMM_WORLD); // make sure first communication batch is completed
+		#endif
+				MPI_Send(current_comm_matrix,num_processes,MPI_INT,MASTER_NODE,process_id,MPI_COMM_WORLD);
+			}
+		#endif
+			
+			double gather_time;
+			if(process_id == MASTER_NODE) {
+				timer = MPI_Wtime();
+				gather_time = timer - global_timer;
+				global_timer = timer;
+			}
+		#ifdef API_PROFILING
+			SCOREP_USER_REGION_END(gather_region);
+			SCOREP_RECORDING_OFF();
+		#endif
+
+			// report
+			if(process_id == MASTER_NODE) {
+				std::string filename = sim_name;
+				filename += "_";
+				filename += part_method;
+				filename += "_";
+				filename += comm_method;
+				char str_int[16];
 				
-			} while(listen);
-		}
-	}
-	
-#endif	
+		#if defined(RECORD_PROCESSES_ACTIVITY) || defined(RECORD_PROCESS_TRACE)
+				// record process average timings + process traces
+				// record timings for computation, idle and synchronisation
+				// one file per process: EXPERIMENTNAME_NPROCESSORS_PROCESSNUMBER
+				sprintf(str_int,"%i",num_processes);
+				filename += "_";
+				filename +=  str_int;
+				for(ii=0; ii < num_processes; ii++) {
+					std::string fprocessor = filename;
+					fprocessor += "_";
+					sprintf(str_int,"%i",ii);
+					fprocessor += str_int;
+					bool fileexists = access(fprocessor.c_str(), F_OK) != -1;
+					FILE *fp = fopen(fprocessor.c_str(), "ab+");
+					if(fp == NULL) {
+						printf("Error when storing processor results into file\n");
+					} else {
+						if(!fileexists) // file does not exist, add header
+							fprintf(fp,"%s,%s,%s,%s,%s,%s,%s,%s\n","Comp time","Idle time","Sync time","Comp deviation","Idle deviation","Sync deviation","Runtime neighbours","Non-empty runtime neighbours");
+						float non_empty_cs = non_empty_comm_steps[ii] == 0 ? 0 : (float)runtime_neighbours[ii]/(num_processes-1)/non_empty_comm_steps[ii];
+						fprintf(fp,"%f,%f,%f,%f,%f,%f,%f,%f\n",comp_times[ii],idle_times[ii],s_times[ii],comp_variances[ii],idle_variances[ii],sync_variances[ii],(float)runtime_neighbours[ii]/(num_processes-1)/communicator->comm_step,non_empty_cs);
+					}
+					fclose(fp);
+		#ifdef RECORD_PROCESS_TRACE
+					std::string fprocess_traces = fprocessor;
+					fprocess_traces += "_trace";
+					fp = fopen(fprocess_traces.c_str(), "ab+");
+					if(fp == NULL) {
+						printf("Error when storing processor results into file\n");
+					} else {
+						for(jj=0; jj < total_traces[ii].size()-1; jj++) {
+							fprintf(fp,"%.9f,",total_traces[ii][jj]);
+						}
+						fprintf(fp,"%.9f\n",total_traces[ii][total_traces.size()-1]);
+					}
+					fclose(fp);
+		#endif
+				}		
+				
+		#endif		
 
-#if defined(ADVANCED_COMM_STATS) || defined(ADVANCED_COMM_STATS_MATRIX_ONLY)
-	// store advanced communication stats (weight of each message)
-	// EXPERIMENT_NAME_comm_sizes_NUM_PROCESSES will contain sizes of all messages (from all processes)
-	// EXPERIMENT_NAME_comm_matrix_NUM_PROCESSES will contain table with total comm between any two processes
-	if(process_id == MASTER_NODE) {
-		std::string filename = sim_name;
-		filename += "_";
-		filename += part_method;
-		filename += "_";
-		filename += comm_method;
-		char str_int[16];
-		sprintf(str_int,"%i",num_processes);
-		filename += "_comm_sizes_";
-		filename +=  str_int;
-		FILE *fp;
-#ifndef ADVANCED_COMM_STATS_MATRIX_ONLY
-		fp = fopen(filename.c_str(), "w+");
-#endif
-		MPI_Status status;
-		int count;
-		// store values for MASTER_NODE first
-		int* current_comm_matrix = (int*)calloc(num_processes,sizeof(int));
-		for(ii=0; ii < communicator->messages_sent.size(); ii++) {
-			int total = 0;
-			for(int p=0; p < communicator->messages_sent[ii].size(); p++) {
-				total += communicator->messages_sent[ii][p];
-#ifndef ADVANCED_COMM_STATS_MATRIX_ONLY
-				fprintf(fp,"%i ",communicator->messages_sent[ii][p]);
-#endif
-			}
-			current_comm_matrix[ii] = total;
-			communicator->messages_sent[ii].clear();
-			communicator->messages_sent[ii].swap(communicator->messages_sent[ii]);
-		}
-#ifndef ADVANCED_COMM_STATS_MATRIX_ONLY
-		// collect message values from other nodes
-		for(ii=0; ii < num_processes; ii++) {
-			if(ii == MASTER_NODE) continue;
-			MPI_Probe(ii,MPI_ANY_TAG,MPI_COMM_WORLD,&status);
-			MPI_Get_count(&status, MPI_INT, &count);
-			int* buffer = (int*)malloc(sizeof(int) * count);
-			MPI_Recv(buffer, count, MPI_INT, ii, MPI_ANY_TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-			for(int ss=0; ss < count; ss++) {
-				// write each value to a file
-				fprintf(fp,"%i ",buffer[ss]);
-			}
-			free(buffer);
-		}
-		fprintf(fp,"\n");
-		fclose(fp);
-
-		MPI_Barrier(MPI_COMM_WORLD); // make sure first communication batch is completed
-#endif
-		// collect total values from other processes (comm matrix)
-		filename = sim_name;
-		filename += "_";
-		filename += part_method;
-		filename += "_";
-		filename += comm_method;
-		filename += "_comm_matrix_";
-		filename +=  str_int;
-		fp = fopen(filename.c_str(), "w+");
-		// store MASTER_NODE local values first
-		for(ii=0; ii < num_processes; ii++) {
-			fprintf(fp,"%i ",current_comm_matrix[ii]);
-		}
-		fprintf(fp,"\n");
-		// collect message values from other nodes
-		for(ii=0; ii < num_processes; ii++) {
-			if(ii == MASTER_NODE) continue;
-			MPI_Probe(ii,MPI_ANY_TAG,MPI_COMM_WORLD,&status);
-			MPI_Get_count(&status, MPI_INT, &count);
-			int* buffer = (int*)malloc(sizeof(int) * count);
-			MPI_Recv(buffer, count, MPI_INT, ii, MPI_ANY_TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-			for(int ss=0; ss < count; ss++) {
-				// write each value to a file
-				fprintf(fp,"%i ",buffer[ss]);
-			}
-			fprintf(fp,"\n");
-			free(buffer);
-		}
-
-		free(current_comm_matrix);
-		fclose(fp);
-	} else {
-		std::vector<int> flatten;
-		int* current_comm_matrix = (int*)calloc(num_processes,sizeof(int));
-		for(ii=0; ii < communicator->messages_sent.size(); ii++) {
-			int total = 0;
-			for(int p=0; p < communicator->messages_sent[ii].size(); p++) {
-				total += communicator->messages_sent[ii][p];
-				flatten.push_back(communicator->messages_sent[ii][p]);
-			}
-			current_comm_matrix[ii] = total;
-			communicator->messages_sent[ii].clear();
-			communicator->messages_sent[ii].swap(communicator->messages_sent[ii]);
-		}
-#ifndef ADVANCED_COMM_STATS_MATRIX_ONLY
-		int* buf;
-		if(flatten.size() > 0)
-			buf = &flatten[0];
-		MPI_Send(buf,flatten.size(),MPI_INT,MASTER_NODE,process_id,MPI_COMM_WORLD);
-
-		MPI_Barrier(MPI_COMM_WORLD); // make sure first communication batch is completed
-#endif
-		MPI_Send(current_comm_matrix,num_processes,MPI_INT,MASTER_NODE,process_id,MPI_COMM_WORLD);
-	}
-#endif
-	
-	double gather_time;
-	if(process_id == MASTER_NODE) {
-		timer = MPI_Wtime();
-		gather_time = timer - global_timer;
-		global_timer = timer;
-	}
-#ifdef API_PROFILING
-	SCOREP_USER_REGION_END(gather_region);
-	SCOREP_RECORDING_OFF();
-#endif
-
-	// report
-	if(process_id == MASTER_NODE) {
-		std::string filename = sim_name;
-		filename += "_";
-		filename += part_method;
-		filename += "_";
-		filename += comm_method;
-		char str_int[16];
-		
-#if defined(RECORD_PROCESSES_ACTIVITY) || defined(RECORD_PROCESS_TRACE)
-		// record process average timings + process traces
-		// record timings for computation, idle and synchronisation
-		// one file per process: EXPERIMENTNAME_NPROCESSORS_PROCESSNUMBER
-		sprintf(str_int,"%i",num_processes);
-		filename += "_";
-		filename +=  str_int;
-		for(ii=0; ii < num_processes; ii++) {
-			std::string fprocessor = filename;
-			fprocessor += "_";
-			sprintf(str_int,"%i",ii);
-			fprocessor += str_int;
-			bool fileexists = access(fprocessor.c_str(), F_OK) != -1;
-			FILE *fp = fopen(fprocessor.c_str(), "ab+");
-			if(fp == NULL) {
-				printf("Error when storing processor results into file\n");
-			} else {
-				if(!fileexists) // file does not exist, add header
-					fprintf(fp,"%s,%s,%s,%s,%s,%s,%s,%s\n","Comp time","Idle time","Sync time","Comp deviation","Idle deviation","Sync deviation","Runtime neighbours","Non-empty runtime neighbours");
-				float non_empty_cs = non_empty_comm_steps[ii] == 0 ? 0 : (float)runtime_neighbours[ii]/(num_processes-1)/non_empty_comm_steps[ii];
-				fprintf(fp,"%f,%f,%f,%f,%f,%f,%f,%f\n",comp_times[ii],idle_times[ii],s_times[ii],comp_variances[ii],idle_variances[ii],sync_variances[ii],(float)runtime_neighbours[ii]/(num_processes-1)/communicator->comm_step,non_empty_cs);
-			}
-			fclose(fp);
-#ifdef RECORD_PROCESS_TRACE
-			std::string fprocess_traces = fprocessor;
-			fprocess_traces += "_trace";
-			fp = fopen(fprocess_traces.c_str(), "ab+");
-			if(fp == NULL) {
-				printf("Error when storing processor results into file\n");
-			} else {
-				for(jj=0; jj < total_traces[ii].size()-1; jj++) {
-					fprintf(fp,"%.9f,",total_traces[ii][jj]);
+				float spikeRate = (1000.0f * total_spikes) / t_end;
+				printf("Spikes: %i, (%li neurons), \nAverage firing rate per neuron: %f Hz\n",total_spikes,model.population_size,spikeRate/model.population_size);
+				printf("Init time: %fs; Gather info time: %fs\n",init_time,gather_time);
+				printf("Computation times:\n");
+				double total_comp = 0;
+				//double min_prop = RAND_MAX;
+				//double max_prop = 0;
+				double total_prop = 0;
+				double total_sync_time = 0;
+				double max_sim_time = 0;
+				double total_idle_time = 0;
+				
+				
+				for(ii = 0; ii < num_processes; ii++){
+					PRINTF("%i: %fs (%f%%); %fs propagate; %fs sync\n",ii,comp_times[ii],comp_times[ii]/sim_time*100,p_times[ii],s_times[ii]);
+					//if(p_times[ii] > max_prop)
+					//	max_prop = p_times[ii];
+					//if(p_times[ii] < min_prop)
+					//	min_prop = p_times[ii];
+					total_prop += p_times[ii];
+					total_sync_time += s_times[ii];
+					total_comp += comp_times[ii];
+					if(max_sim_time < sim_times[ii])
+						max_sim_time = sim_times[ii];
+					total_idle_time += idle_times[ii];
 				}
-				fprintf(fp,"%.9f\n",total_traces[ii][total_traces.size()-1]);
-			}
-			fclose(fp);
-#endif
-		}		
-		
-#endif		
-
-		float spikeRate = (1000.0f * total_spikes) / t_end;
-		printf("Spikes: %i, (%li neurons), \nAverage firing rate per neuron: %f Hz\n",total_spikes,model.population_size,spikeRate/model.population_size);
-		printf("Init time: %fs; Gather info time: %fs\n",init_time,gather_time);
-		printf("Computation times:\n");
-		double total_comp = 0;
-		//double min_prop = RAND_MAX;
-		//double max_prop = 0;
-		double total_prop = 0;
-		double total_sync_time = 0;
-		double max_sim_time = 0;
-		double total_idle_time = 0;
-		
-		
-		for(ii = 0; ii < num_processes; ii++){
-			PRINTF("%i: %fs (%f%%); %fs propagate; %fs sync\n",ii,comp_times[ii],comp_times[ii]/sim_time*100,p_times[ii],s_times[ii]);
-			//if(p_times[ii] > max_prop)
-			//	max_prop = p_times[ii];
-			//if(p_times[ii] < min_prop)
-			//	min_prop = p_times[ii];
-			total_prop += p_times[ii];
-			total_sync_time += s_times[ii];
-			total_comp += comp_times[ii];
-			if(max_sim_time < sim_times[ii])
-				max_sim_time = sim_times[ii];
-			total_idle_time += idle_times[ii];
-		}
-		// calculate variances
-		double prop_variance = 0;
-		double comp_variance = 0;
-		double sync_variance = 0;
-		double idle_variance = 0;
-		double avg_comp = total_comp/num_processes;
-		double avg_prop = total_prop/num_processes;
-		double avg_sync = total_sync_time/num_processes;
-		double avg_idle = total_idle_time/num_processes;
-		for(ii = 0; ii < num_processes; ii++) {
-			comp_variance += (comp_times[ii]-avg_comp) * (comp_times[ii] - avg_comp);
-			prop_variance += (p_times[ii]-avg_prop) * (p_times[ii] - avg_prop);
-			sync_variance += (s_times[ii]-avg_sync) * (s_times[ii] - avg_sync);
-			idle_variance += (idle_times[ii]-avg_idle) * (idle_times[ii] - avg_idle);
-		}
-		comp_variance = sqrt(comp_variance / num_processes);
-		prop_variance = sqrt(prop_variance / num_processes);
-		sync_variance = sqrt(sync_variance / num_processes);
-		idle_variance = sqrt(idle_variance / num_processes);
-
-		printf("Deviation in computation: %f\n",comp_variance);
-		printf("Deviation in propagation: %f\n",prop_variance);
-		printf("Deviation in synchronisation (data exchange): %f\n",sync_variance);
-		printf("Deviation in idle (implicit sync): %f\n",idle_variance);
-		printf("Theoretical - messages sent (bytes):\n");
-		long int total_sent = 0;
-		for(ii = 0; ii < num_processes; ii++){
-			total_sent += comm_sent[ii];
-			PRINTF("%i: %lu bytes\n",ii,comm_sent[ii]);
-		}
-		printf("Total sim time: %f\n",max_sim_time);
-		printf("Total communication: %lu messages, %lu bytes\n",messages_sent,total_sent);
-		printf("Total sync time (per process): %f\n",total_sync_time/num_processes);
-		printf("Total idle time (per process): %f\n",total_idle_time/num_processes);
-		printf("Total computational time (per process): %f\n",avg_comp);
-		// record global sim results
-		filename = sim_name;
-		filename += "_";
-		filename += part_method;
-		filename += "_";
-		filename += comm_method;
-		sprintf(str_int,"%i",num_processes);
-		filename += "__";
-		filename +=  str_int;
-		bool fileexists = access(filename.c_str(), F_OK) != -1;
-		FILE *fp = fopen(filename.c_str(), "ab+");
-		double tcm = (double)total_interprocess_spikes/(double)total_spikes;
-		if(fp == NULL) {
-			printf("Error when storing results into file\n");
-		} else {
-			/*if(!fileexists) // file does not exist, add header
-				fprintf(fp,"%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n","Build time","Sim time (per process)","Comp time (per process)","Comp variance","Propagation time (per process)","Prop variance","Sync time (per process)","Idle time (per process)","Bytes sent (minimum),Messages sent","Random seed","Edgecut","Total connections","Edgecut ratio","Neuronal computation imbalance","Synaptic computation imbalance","Spikes sent","Total spikes","Remote spikes","Total comm cost","Comm cost ratio","Avg sync group size","Average runtime neighbours","Average non-empty runtime neighbours");
-			fprintf(fp,"%f,%f,%f,%f,%f,%f,%f,%f,%lu,%lu,%i,%i,%i,%f,%f,%f,%lu,%i,%i,%f,%f,%f,%f,%f\n",init_time,max_sim_time,avg_comp,comp_variance,avg_prop,prop_variance,total_sync_time/num_processes,total_idle_time/num_processes,total_sent,messages_sent,random_seed,total_cut,model.total_connections,(float)total_cut/model.total_connections,neuron_comp_imbalance,total_synapse_comp_imbalance,total_interprocess_spikes,total_spikes,total_remote_spikes,tcm,tcm / (num_processes-1),avg_sync_group_size,average_runtime_neighbours,average_non_empty_runtime_neighbours);
-			*/
-			if(!fileexists) // file does not exist, add header
-				fprintf(fp,"%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n","Build time","Sim time (per process)","Comp time (per process)","Comp deviation","Sync deviation","Idle deviation","Sync time (per process)","Idle time (per process)","Bytes sent (minimum),Messages sent","Random seed","Edgecut","Total connections","Edgecut ratio","Total computation imbalance","Neuronal computation imbalance","Synaptic computation imbalance","Spikes sent","Total spikes","Remote spikes","Total comm cost","Comm cost ratio","Avg sync group size","Average runtime neighbours","Average non-empty runtime neighbours");
-			fprintf(fp,"%f,%f,%f,%f,%f,%f,%f,%f,%lu,%lu,%i,%i,%i,%f,%f,%f,%f,%lu,%i,%i,%f,%f,%f,%f,%f\n",init_time,max_sim_time,avg_comp,comp_variance,sync_variance,idle_variance,total_sync_time/num_processes,total_idle_time/num_processes,total_sent,messages_sent,random_seed,total_cut,model.total_connections,(float)total_cut/model.total_connections,total_comp_imbalance,neuron_comp_imbalance,synapse_comp_imbalance,total_interprocess_spikes,total_spikes,total_remote_spikes,tcm,tcm / (num_processes-1),avg_sync_group_size,average_runtime_neighbours,average_non_empty_runtime_neighbours);
-
-		}
-		fclose(fp);
-#ifdef RECORD_ACTIVITY		
-		// neuron_activity contains the spike activity (timings) of all neurons
-		// store neuron_activity in file
-		std::string neuron_activity_filename = filename;
-		neuron_activity_filename += "_neuron_activity";
-		FILE *fneuron_activity = fopen(neuron_activity_filename.c_str(), "wb"); // all spikes
-		for(int ii=0; ii < global_activity.size(); ii++) {
-			fprintf(fneuron_activity,"%lu ",global_activity[ii].size()); // ISI
-		}
-#endif
-#ifdef RECORD_STATISTICS
-		
-		// store statistics
-		std::string intervals_filename = filename;
-		intervals_filename += "_ISI";
-		std::string spikes_filename = filename;
-		spikes_filename += "_spikes";
-		std::string isicv_filename = filename;
-		isicv_filename += "_ISICV";
-		FILE *fintervals = fopen(intervals_filename.c_str(), "wb"); // all neurons ISI
-		FILE *fspikes = fopen(spikes_filename.c_str(), "wb"); // all neurons spikes
-		FILE** fisicv_pop = (FILE**)malloc(sizeof(FILE*) * pops.size()); // ISICV per population
-		FILE *fisicv = fopen(isicv_filename.c_str(), "wb"); // all neurons ISI CV
-		FILE** fintervals_pop = (FILE**)malloc(sizeof(FILE*) * pops.size()); // neurons in population ISI
-		FILE** fspikes_pop = (FILE**)malloc(sizeof(FILE*) * pops.size()); // neurons in population spikes
-		for(int ii=0; ii < pops.size(); ii++) {
-			std::string pop_intervals_filename = intervals_filename;
-			pop_intervals_filename += "_";
-			pop_intervals_filename += pops[ii]->name;
-			fintervals_pop[ii] = fopen(pop_intervals_filename.c_str(), "wb");
-			std::string pop_spikes_filename = spikes_filename;
-			pop_spikes_filename += "_";
-			pop_spikes_filename += pops[ii]->name;
-			fspikes_pop[ii] = fopen(pop_spikes_filename.c_str(), "wb");
-			std::string pop_isicv_filename = isicv_filename;
-			pop_isicv_filename += "_";
-			pop_isicv_filename += pops[ii]->name;
-			fisicv_pop[ii] = fopen(pop_isicv_filename.c_str(), "wb");
-		}
-		// check all FILE streams are not NULL!
-		// store neuron spikes
-		std::vector<std::vector<float> > neuron_isi(model.population_size,std::vector<float>(0));
-		std::vector<int> spikes_pop(pops.size(),0);
-		for(int ii=0; ii < global_activity.size(); ii++) {
-			int spikes = 0;
-			float lastSpike = 0;
-			int pop_belonging = 0;
-			for(int pp=0; pp < pops.size(); pp++) {
-				if(pops[pp]->is_in_population(ii)) { 
-				//if(ii >= pops[pp]->first_idx && ii < pops[pp]->first_idx + pops[pp]->num_neurons) {
-					pop_belonging = pp;
-					break;
+				// calculate variances
+				double prop_variance = 0;
+				double comp_variance = 0;
+				double sync_variance = 0;
+				double idle_variance = 0;
+				double avg_comp = total_comp/num_processes;
+				double avg_prop = total_prop/num_processes;
+				double avg_sync = total_sync_time/num_processes;
+				double avg_idle = total_idle_time/num_processes;
+				for(ii = 0; ii < num_processes; ii++) {
+					comp_variance += (comp_times[ii]-avg_comp) * (comp_times[ii] - avg_comp);
+					prop_variance += (p_times[ii]-avg_prop) * (p_times[ii] - avg_prop);
+					sync_variance += (s_times[ii]-avg_sync) * (s_times[ii] - avg_sync);
+					idle_variance += (idle_times[ii]-avg_idle) * (idle_times[ii] - avg_idle);
 				}
-			}
-			for(jj=0; jj < global_activity[ii].size(); jj++) {
-				spikes++;
-				spikes_pop[pop_belonging] += 1;
-				if(lastSpike > 0) {
-					neuron_isi[ii].push_back((global_activity[ii][jj] - lastSpike) * dt);
-					fprintf(fintervals,"%f ",(global_activity[ii][jj] - lastSpike) * dt); // ISI
+				comp_variance = sqrt(comp_variance / num_processes);
+				prop_variance = sqrt(prop_variance / num_processes);
+				sync_variance = sqrt(sync_variance / num_processes);
+				idle_variance = sqrt(idle_variance / num_processes);
+
+				printf("Deviation in computation: %f\n",comp_variance);
+				printf("Deviation in propagation: %f\n",prop_variance);
+				printf("Deviation in synchronisation (data exchange): %f\n",sync_variance);
+				printf("Deviation in idle (implicit sync): %f\n",idle_variance);
+				printf("Theoretical - messages sent (bytes):\n");
+				long int total_sent = 0;
+				for(ii = 0; ii < num_processes; ii++){
+					total_sent += comm_sent[ii];
+					PRINTF("%i: %lu bytes\n",ii,comm_sent[ii]);
+				}
+				printf("Total sim time: %f\n",max_sim_time);
+				printf("Total communication: %lu messages, %lu bytes\n",messages_sent,total_sent);
+				printf("Total sync time (per process): %f\n",total_sync_time/num_processes);
+				printf("Total idle time (per process): %f\n",total_idle_time/num_processes);
+				printf("Total computational time (per process): %f\n",avg_comp);
+				// record global sim results
+				filename = sim_name;
+				filename += "_";
+				filename += part_method;
+				filename += "_";
+				filename += comm_method;
+				sprintf(str_int,"%i",num_processes);
+				filename += "__";
+				filename +=  str_int;
+				bool fileexists = access(filename.c_str(), F_OK) != -1;
+				FILE *fp = fopen(filename.c_str(), "ab+");
+				double tcm = (double)total_interprocess_spikes/(double)total_spikes;
+				if(fp == NULL) {
+					printf("Error when storing results into file\n");
+				} else {
+					/*if(!fileexists) // file does not exist, add header
+						fprintf(fp,"%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n","Build time","Sim time (per process)","Comp time (per process)","Comp variance","Propagation time (per process)","Prop variance","Sync time (per process)","Idle time (per process)","Bytes sent (minimum),Messages sent","Random seed","Edgecut","Total connections","Edgecut ratio","Neuronal computation imbalance","Synaptic computation imbalance","Spikes sent","Total spikes","Remote spikes","Total comm cost","Comm cost ratio","Avg sync group size","Average runtime neighbours","Average non-empty runtime neighbours");
+					fprintf(fp,"%f,%f,%f,%f,%f,%f,%f,%f,%lu,%lu,%i,%i,%i,%f,%f,%f,%lu,%i,%i,%f,%f,%f,%f,%f\n",init_time,max_sim_time,avg_comp,comp_variance,avg_prop,prop_variance,total_sync_time/num_processes,total_idle_time/num_processes,total_sent,messages_sent,random_seed,total_cut,model.total_connections,(float)total_cut/model.total_connections,neuron_comp_imbalance,total_synapse_comp_imbalance,total_interprocess_spikes,total_spikes,total_remote_spikes,tcm,tcm / (num_processes-1),avg_sync_group_size,average_runtime_neighbours,average_non_empty_runtime_neighbours);
+					*/
+					if(!fileexists) // file does not exist, add header
+						fprintf(fp,"%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n","Build time","Sim time (per process)","Comp time (per process)","Comp deviation","Sync deviation","Idle deviation","Sync time (per process)","Idle time (per process)","Bytes sent (minimum),Messages sent","Random seed","Edgecut","Total connections","Edgecut ratio","Total computation imbalance","Neuronal computation imbalance","Synaptic computation imbalance","Spikes sent","Total spikes","Remote spikes","Total comm cost","Comm cost ratio","Avg sync group size","Average runtime neighbours","Average non-empty runtime neighbours");
+					fprintf(fp,"%f,%f,%f,%f,%f,%f,%f,%f,%lu,%lu,%i,%i,%i,%f,%f,%f,%f,%lu,%i,%i,%f,%f,%f,%f,%f\n",init_time,max_sim_time,avg_comp,comp_variance,sync_variance,idle_variance,total_sync_time/num_processes,total_idle_time/num_processes,total_sent,messages_sent,random_seed,total_cut,model.total_connections,(float)total_cut/model.total_connections,total_comp_imbalance,neuron_comp_imbalance,synapse_comp_imbalance,total_interprocess_spikes,total_spikes,total_remote_spikes,tcm,tcm / (num_processes-1),avg_sync_group_size,average_runtime_neighbours,average_non_empty_runtime_neighbours);
+
+				}
+				fclose(fp);
+		#ifdef RECORD_ACTIVITY		
+				// neuron_activity contains the spike activity (timings) of all neurons
+				// store neuron_activity in file
+				std::string neuron_activity_filename = filename;
+				neuron_activity_filename += "_neuron_activity";
+				FILE *fneuron_activity = fopen(neuron_activity_filename.c_str(), "wb"); // all spikes
+				for(int ii=0; ii < global_activity.size(); ii++) {
+					fprintf(fneuron_activity,"%lu ",global_activity[ii].size()); // ISI
+				}
+		#endif
+		#ifdef RECORD_STATISTICS
+				
+				// store statistics
+				std::string intervals_filename = filename;
+				intervals_filename += "_ISI";
+				std::string spikes_filename = filename;
+				spikes_filename += "_spikes";
+				std::string isicv_filename = filename;
+				isicv_filename += "_ISICV";
+				FILE *fintervals = fopen(intervals_filename.c_str(), "wb"); // all neurons ISI
+				FILE *fspikes = fopen(spikes_filename.c_str(), "wb"); // all neurons spikes
+				FILE** fisicv_pop = (FILE**)malloc(sizeof(FILE*) * pops.size()); // ISICV per population
+				FILE *fisicv = fopen(isicv_filename.c_str(), "wb"); // all neurons ISI CV
+				FILE** fintervals_pop = (FILE**)malloc(sizeof(FILE*) * pops.size()); // neurons in population ISI
+				FILE** fspikes_pop = (FILE**)malloc(sizeof(FILE*) * pops.size()); // neurons in population spikes
+				for(int ii=0; ii < pops.size(); ii++) {
+					std::string pop_intervals_filename = intervals_filename;
+					pop_intervals_filename += "_";
+					pop_intervals_filename += pops[ii]->name;
+					fintervals_pop[ii] = fopen(pop_intervals_filename.c_str(), "wb");
+					std::string pop_spikes_filename = spikes_filename;
+					pop_spikes_filename += "_";
+					pop_spikes_filename += pops[ii]->name;
+					fspikes_pop[ii] = fopen(pop_spikes_filename.c_str(), "wb");
+					std::string pop_isicv_filename = isicv_filename;
+					pop_isicv_filename += "_";
+					pop_isicv_filename += pops[ii]->name;
+					fisicv_pop[ii] = fopen(pop_isicv_filename.c_str(), "wb");
+				}
+				// check all FILE streams are not NULL!
+				// store neuron spikes
+				std::vector<std::vector<float> > neuron_isi(model.population_size,std::vector<float>(0));
+				std::vector<int> spikes_pop(pops.size(),0);
+				for(int ii=0; ii < global_activity.size(); ii++) {
+					int spikes = 0;
+					float lastSpike = 0;
+					int pop_belonging = 0;
+					for(int pp=0; pp < pops.size(); pp++) {
+						if(pops[pp]->is_in_population(ii)) { 
+						//if(ii >= pops[pp]->first_idx && ii < pops[pp]->first_idx + pops[pp]->num_neurons) {
+							pop_belonging = pp;
+							break;
+						}
+					}
+					for(jj=0; jj < global_activity[ii].size(); jj++) {
+						spikes++;
+						spikes_pop[pop_belonging] += 1;
+						if(lastSpike > 0) {
+							neuron_isi[ii].push_back((global_activity[ii][jj] - lastSpike) * dt);
+							fprintf(fintervals,"%f ",(global_activity[ii][jj] - lastSpike) * dt); // ISI
+							// per pop
+							fprintf(fintervals_pop[pop_belonging],"%f ",(global_activity[ii][jj] - lastSpike) * dt);
+						}
+						lastSpike = global_activity[ii][jj];
+						
+					}
+					fprintf(fspikes,"%i ",spikes); // activity (spikes) of that neuron
+					
+					// record TOTAL ISI coefficient of variation for that cell (std / mean)
+					if(neuron_isi[ii].size() > 1) {
+						double total = std::accumulate(neuron_isi[ii].begin(),neuron_isi[ii].end(),0.0);
+						double mean = total / neuron_isi[ii].size();
+						std::vector<double> diff(neuron_isi[ii].size());
+						std::transform(neuron_isi[ii].begin(), neuron_isi[ii].end(), diff.begin(),std::bind2nd(std::minus<double>(), mean));
+						double sq_sum = std::inner_product(diff.begin(), diff.end(), diff.begin(), 0.0);
+						double stdev = sqrt(sq_sum / neuron_isi[ii].size());
+						fprintf(fisicv,"%f ",stdev / mean); // ISI coefficient of variation for that neuron
+					}
+					
 					// per pop
-					fprintf(fintervals_pop[pop_belonging],"%f ",(global_activity[ii][jj] - lastSpike) * dt);
+					fprintf(fspikes_pop[pop_belonging],"%i ",spikes);
+					if(neuron_isi[ii].size() > 1) {
+						double total = std::accumulate(neuron_isi[ii].begin(),neuron_isi[ii].end(),0.0);
+						double mean = total / neuron_isi[ii].size();
+						std::vector<double> diff(neuron_isi[ii].size());
+						std::transform(neuron_isi[ii].begin(), neuron_isi[ii].end(), diff.begin(),std::bind2nd(std::minus<double>(), mean));
+						double sq_sum = std::inner_product(diff.begin(), diff.end(), diff.begin(), 0.0);
+						double stdev = sqrt(sq_sum / neuron_isi[ii].size());
+						fprintf(fisicv_pop[pop_belonging],"%f ",stdev / mean); // ISI coefficient of variation for that neuron
+					}
+					
 				}
-				lastSpike = global_activity[ii][jj];
 				
-			}
-			fprintf(fspikes,"%i ",spikes); // activity (spikes) of that neuron
-			
-			// record TOTAL ISI coefficient of variation for that cell (std / mean)
-			if(neuron_isi[ii].size() > 1) {
-				double total = std::accumulate(neuron_isi[ii].begin(),neuron_isi[ii].end(),0.0);
-				double mean = total / neuron_isi[ii].size();
-				std::vector<double> diff(neuron_isi[ii].size());
-				std::transform(neuron_isi[ii].begin(), neuron_isi[ii].end(), diff.begin(),std::bind2nd(std::minus<double>(), mean));
-				double sq_sum = std::inner_product(diff.begin(), diff.end(), diff.begin(), 0.0);
-				double stdev = sqrt(sq_sum / neuron_isi[ii].size());
-				fprintf(fisicv,"%f ",stdev / mean); // ISI coefficient of variation for that neuron
-			}
-			
-			// per pop
-			fprintf(fspikes_pop[pop_belonging],"%i ",spikes);
-			if(neuron_isi[ii].size() > 1) {
-				double total = std::accumulate(neuron_isi[ii].begin(),neuron_isi[ii].end(),0.0);
-				double mean = total / neuron_isi[ii].size();
-				std::vector<double> diff(neuron_isi[ii].size());
-				std::transform(neuron_isi[ii].begin(), neuron_isi[ii].end(), diff.begin(),std::bind2nd(std::minus<double>(), mean));
-				double sq_sum = std::inner_product(diff.begin(), diff.end(), diff.begin(), 0.0);
-				double stdev = sqrt(sq_sum / neuron_isi[ii].size());
-				fprintf(fisicv_pop[pop_belonging],"%f ",stdev / mean); // ISI coefficient of variation for that neuron
+				for(int ii=0; ii < pops.size(); ii++) {
+					printf("Population %s average firing rate: %f\n",pops[ii]->name.c_str(),((float)spikes_pop[ii] * 1000.0f / t_end)/(float)pops[ii]->num_neurons);
+					fclose(fintervals_pop[ii]);
+					fclose(fspikes_pop[ii]);
+					fclose(fisicv_pop[ii]);
+				}
+				free(fisicv_pop);
+				free(fintervals_pop);
+				free(fspikes_pop);
+				fclose(fspikes);
+				fclose(fintervals);
+				fclose(fisicv);
+				fclose(fneuron_activity);
+		#endif
 			}
 			
-		}
-		
-		for(int ii=0; ii < pops.size(); ii++) {
-			printf("Population %s average firing rate: %f\n",pops[ii]->name.c_str(),((float)spikes_pop[ii] * 1000.0f / t_end)/(float)pops[ii]->num_neurons);
-			fclose(fintervals_pop[ii]);
-			fclose(fspikes_pop[ii]);
-			fclose(fisicv_pop[ii]);
-		}
-		free(fisicv_pop);
-		free(fintervals_pop);
-		free(fspikes_pop);
-		fclose(fspikes);
-		fclose(fintervals);
-		fclose(fisicv);
-		fclose(fneuron_activity);
-#endif
-	}
-	
-	
-	
-	if(globalNeuronRefs != NULL) free(globalNeuronRefs);
-	
-	delete communicator;
-	delete partition;
-	
-	
-	if(custom_partitioning != NULL) free(custom_partitioning);
+			
+			
+			if(globalNeuronRefs != NULL) free(globalNeuronRefs);
+			
+			delete communicator;
+			delete partition;
+			
+			
+			if(custom_partitioning != NULL) free(custom_partitioning);
 
-	free(computation_times);
-	free(propagate_times);
-	free(sync_time);
-	free(idle_time);
-#ifdef RECORD_PROCESS_TRACE
-	free(trace_timings);
-#endif
-	free(comp_times);
-	free(comm_sent);
-	free(p_times);
-	free(sim_times);
-	free(idle_times);
-	free(s_times);
-	free(comp_variances);
-	free(idle_variances);
-	free(sync_variances);
-	free(runtime_neighbours);
-	free(non_empty_comm_steps);
+			free(computation_times);
+			free(propagate_times);
+			free(sync_time);
+			free(idle_time);
+		#ifdef RECORD_PROCESS_TRACE
+			free(trace_timings);
+		#endif
+			free(comp_times);
+			free(comm_sent);
+			free(p_times);
+			free(sim_times);
+			free(idle_times);
+			free(s_times);
+			free(comp_variances);
+			free(idle_variances);
+			free(sync_variances);
+			free(runtime_neighbours);
+			free(non_empty_comm_steps);
 
 		}
 
