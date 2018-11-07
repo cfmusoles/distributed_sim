@@ -311,7 +311,7 @@ int main(int argc, char** argv) {
 		MPI_Finalize();
 		return 0;
 	}
-	PRINTF("%i: Model selected %s, Neuron scale: %f, Synaptic scale: %f, Simulated time: %i\n",model_selected,process_id,n_scale,k_scale,t_end);
+	PRINTF("%i: Model selected %s, Neuron scale: %f, Synaptic scale: %f, Simulated time: %i\n",model_selected,n_scale,k_scale,t_end);
 
 	// gathering comm patterns and partitioning methods
 	// user can supply multiple via : syntax (example: -c nbx:pex)
