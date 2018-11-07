@@ -1223,6 +1223,7 @@ int main(int argc, char** argv) {
 		}
 	}
 
+
 	// injections
 	srand(random_seed); // ensure base population with same seed has same injectors connectivity
 	for(int ii=0; ii < injections.size(); ii++) {
@@ -1301,11 +1302,87 @@ int main(int argc, char** argv) {
 		
 	}
 
-	//////////////////////////////
-	/// TODO: Can we use Distributed CSR format to only store local neurons connectivity? (ParMETIS)
-	//////////////////////////////
 	// construct Model from connectivity and population objects
+	// to save memory, construct only in master node, then distribute complete model
 	int exc = 0, inh = 0;
+	model.population_size = population_size;
+	model.interconnections_size = (int*)calloc(model.population_size,sizeof(int));
+	model.interconnections = (int**)malloc(sizeof(int*) * model.population_size);
+	if(process_id == MASTER_NODE) {
+		// get the number of connections per pre synaptic neuron
+		for(int ii=0; ii < conns.size(); ii++) {
+			PRINTF("%i: Creating connection set %i out of %lu\n",process_id,ii+1,conns.size());
+			if(!MODEL_LOADED_FROM_FILE) conns[ii]->generate_connectivity(model.population_size);
+			for(int jj=0; jj < conns[ii]->connections.size(); jj++) {
+				int con_length = conns[ii]->connections[jj].size();
+				int nid = conns[ii]->from->neuron_ids[jj];
+				model.interconnections_size[nid] += con_length;
+			}
+		}
+		// initialise pre-synaptic neuron data structures
+		int* lastId = (int*)calloc(model.population_size,sizeof(int));
+		for(int ii=0; ii < model.population_size; ii++) {
+			model.interconnections[ii] = (int*)malloc(sizeof(int) * model.interconnections_size[ii]);
+		}
+		// assign post-synaptic neuron ids (and weights) to connection lists
+		for(int ii=0; ii < conns.size(); ii++) {
+			for(int jj=0; jj < conns[ii]->connections.size(); jj++) {
+				int con_length = conns[ii]->connections[jj].size();
+				int nid = conns[ii]->from->neuron_ids[jj];
+				for(int cc=0; cc < con_length; cc++) {
+					if(conns[ii]->from->type == EXC) {
+						model.interconnections[nid][lastId[nid]] = conns[ii]->connections[jj][cc];
+						exc++;
+					} else {
+						model.interconnections[nid][lastId[nid]] = -conns[ii]->connections[jj][cc];
+						inh++;
+					}
+					lastId[nid] += 1;
+				}
+			}
+			
+			// clean up connectivity object
+			delete conns[ii];
+		}
+		conns.clear();
+		free(lastId);
+
+		// send model to other processes
+		for(int ii=0; ii < num_processes; ii++) {
+			if(ii == MASTER_NODE) continue;
+			// exc and inh connection numbers
+			MPI_Send(&exc,1,MPI_INT,ii,0,MPI_COMM_WORLD);
+			MPI_Send(&inh,1,MPI_INT,ii,0,MPI_COMM_WORLD);
+			// model.interconnections_size
+			MPI_Send(model.interconnections_size,model.population_size,MPI_INT,ii,0,MPI_COMM_WORLD);
+			for(int jj=0; jj < model.population_size; jj++) {
+				MPI_Send(model.interconnections[jj],model.interconnections_size[jj],MPI_INT,ii,jj,MPI_COMM_WORLD);
+			}
+		}
+	} else {
+		// receive model from master node
+		// exc and inh connections
+		MPI_Recv(&exc,1,MPI_INT,MASTER_NODE,0,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
+		MPI_Recv(&inh,1,MPI_INT,MASTER_NODE,0,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
+		// model.interconnections_size
+		MPI_Recv(model.interconnections_size,model.population_size,MPI_INT,MASTER_NODE,0,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
+
+		// model.interconnections
+		for(int ii=0; ii < model.population_size; ii++) {
+			model.interconnections[ii] = (int*)malloc(sizeof(int) * model.interconnections_size[ii]);
+		}
+		for(int ii=0; ii < model.population_size; ii++) {
+			MPI_Recv(model.interconnections[ii],model.interconnections_size[ii],MPI_INT,MASTER_NODE,ii,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
+		}
+		// clean up conns structure
+		for(int ii=0; ii < conns.size(); ii++) {
+			delete conns[ii];
+		}
+		conns.clear();
+	}
+
+	
+	/*int exc = 0, inh = 0;
 	model.population_size = population_size;
 	// get the number of connections per pre synaptic neuron
 	model.interconnections_size = (int*)calloc(model.population_size,sizeof(int));
@@ -1346,6 +1423,8 @@ int main(int argc, char** argv) {
 	}
 	conns.clear();
 	free(lastId);
+	*/
+
 
 	
 	model.total_connections = exc + inh;

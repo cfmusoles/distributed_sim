@@ -6,56 +6,10 @@ SAFE account https://www.archer.ac.uk/safe/
 
 Login: ssh -l musoles login.archer.ac.uk
 	username musoles
-	password: Carlo$FernandezMu$oles84
+	password: name camel $ + $84
 
-SOFTWARE TO INSTALL
+ARCHER_build steps.txt contains information regarding dependencies compilation in archer
 
-To compile, switch to GNU gcc
-	module switch PrgEnv-cray PrgEnv-intel
-	module load gcc
-
-CMake
-	wget http://www.cmake.org/files/v2.8/cmake-2.8.3.tar.gz
-	tar xzf cmake-2.8.3.tar.gz
-	cd cmake-2.8.3
-	./configure --prefix=~/cmake-2.8.3/build
-	make
-	make install
-	add to .bashrc
-		export PATH="/home/e582/e582/musoles/cmake-2.8.3/build/bin:$PATH"
-
-install METIS
-	wget http://glaros.dtc.umn.edu/gkhome/fetch/sw/metis/metis-5.1.0.tar.gz
-	tar xvf metis-5.1.0.tar.gz
-	cd metis-5.1.0
-	Edit the file include/metis.h and specify the width (32 or 64 bits) of the
-	   elementary data type used in METIS. This is controled by the IDXTYPEWIDTH
-	   constant.
-	make config cc=cc cxx=CC prefix=~/metis-5.1.0/build
-	make
-	make install
-install ParMETIS (needs to be built with the MPI compiler that is going to be used with)
-	wget http://glaros.dtc.umn.edu/gkhome/fetch/sw/parmetis/parmetis-4.0.3.tar.gz
-	tar xvf parmetis-4.0.3.tar.gz
-	cd parmetis-4.0.3
-	Edit the file metis/include/metis.h and specify the width (32 or 64 bits) of the
-	   elementary data type used in METIS. This is controled by the IDXTYPEWIDTH
-	   constant
-	make config cc=cc cxx=CC prefix=~/parmetis-4.0.3/build/
-	make
-	make install
-
-Zoltan
-	wget http://www.cs.sandia.gov/~kddevin/Zoltan_Distributions/zoltan_distrib_v3.83.tar.gz
-	tar -xvf zoltan_distrib_v3.83.tar.gz
-	cd Zoltan_v3.83
-	mkdir build
-	cd build
-	../configure -C CC=cc CXX=CC --prefix=$HOME/Zoltan_v3.83/build --enable-mpi --with-mpi-compilers --with-gnumake --with-id-type=ulong
-	with parmetis (does not seem to work)
-		../configure -C CC=cc CXX=CC --prefix=$HOME/Zoltan_v3.83/build --enable-mpi --with-mpi-compilers --with-gnumake --with-id-type=ulong --with-parmetis --with-parmetis-incdir=$HOME/parmetis-4.0.3/build/include --with-parmetis-libdir=$HOME/parmetis-4.0.3/build/lib CFLAGS="-I$HOME/metis-5.1.0/build/include/" LDFLAGS="-L$HOME/metis-5.1.0/build/lib"
-	make everything
-	make install
 
 TRANSFER DATA
 
