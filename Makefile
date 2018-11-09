@@ -38,7 +38,7 @@ profile:
 
 .PHONY: archer
 archer:
-	$(ARCHER_CC) -o $(OUT) $(INCLUDES_ARCHER) $(ARCHER_LIBS) $(FILES) $(LDFLAGS) $(LSTATIC)
+	$(ARCHER_CC) -O3 -o $(OUT) $(INCLUDES_ARCHER) $(ARCHER_LIBS) $(FILES) $(LDFLAGS) $(LSTATIC)
 
 
 .PHONY: clean

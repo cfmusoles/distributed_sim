@@ -24,6 +24,7 @@ done
 
 #copy necessary files
 cp $APP_NAME $WORK_DIR/$EXPERIMENT_NAME/
+cp resources/multiareaModel.json $WORK_DIR/$EXPERIMENT_NAME/
 chmod +x archer_retrieve_results.sh
 cp archer_retrieve_results.sh $WORK_DIR/$EXPERIMENT_NAME/
 cp prune_results.py $WORK_DIR/$EXPERIMENT_NAME/
@@ -37,6 +38,8 @@ do
 	PROCESS_COUNT=$(($MIN_PROCESSORS * $GEOMETRIC_STEP ** ($p-1)))
 	FILENAME="archer_job_"$EXPERIMENT_NAME"_"$PROCESS_COUNT".sh"
 	echo "Launching job: "$FILENAME
+	# launching twice to get two different node allocations
+	qsub $FILENAME
 	qsub $FILENAME
 	rm $FILENAME
 done
