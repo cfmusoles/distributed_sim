@@ -20,7 +20,7 @@ template_4='''
 
 APP_NAME="distSim"
 PRUNE_COLUMN=4 # propagation time (sync time + idle)
-ITERATIONS=2
+ITERATIONS=1
 REPETITIONS=2
 PROCESSES='''
 template_5='''
@@ -37,7 +37,7 @@ run_experiment() {
 	PRUNE="$5"
 	for i in $(seq 1 $REPETITIONS)
 	do
-		aprun -n $P $APP_NAME -n $EXPERIMENT_NAME -c $COMM_PATTERN -p $DISTRIBUTION -s $SEED -k 1000 -f 170 -t 350 -m "mvc"
+		aprun -n $P $APP_NAME -n $EXPERIMENT_NAME -c $COMM_PATTERN -p $DISTRIBUTION -s $SEED -k 1000 -f 160 -t 300 -m "mvc"
 		sleep 1
 	done
 	if [ $PRUNE == "yes" ]
@@ -53,6 +53,7 @@ for r in $(seq 1 $ITERATIONS)
 do
 	SEED=$RANDOM
 	run_experiment $PROCESSES "roundrobin" "pex" $SEED "no"
+	#run_experiment $PROCESSES "randomBalanced" "pex" $SEED "no"
 	run_experiment $PROCESSES "hypergraphPartitioning" "nbx" $SEED "no"
 done
 

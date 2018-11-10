@@ -3,7 +3,7 @@
 //#define RECORD_ACTIVITY					// store neuron activity in file
 //#define RECORD_PROCESSES_ACTIVITY		// store processes timings (one file per process)
 //#define RECORD_PROCESS_TRACE			// store processes trace information (timing for compute, comm, etc.)
-#define MEASURE_IDLE_TIME				// Separate comm into process idle (wait for others) and sync time
+//#define MEASURE_IDLE_TIME				// Separate comm into process idle (wait for others) and sync time
 //#define ADVANCED_COMM_STATS				// store, for each communication, size of message
 //#define ADVANCED_COMM_STATS_MATRIX_ONLY	// only store process-to-process total messaging (not individual message size) 
 //#define VERBOSE						// display debugging information (build time)
@@ -395,7 +395,6 @@ int main(int argc, char** argv) {
 	//float n_scale = 0.20f; // scale number of neurons
 	//float k_scale = 1.0f;	// scale power of synapses
 	
-
 	if(strcmp(model_selected,"cm") == 0) {
 		// USED FOR FRONTIERS IN NEUROINFORMATICS PAPER //
 		// CORTICAL MICROCIRCUIT without injectors. To generate activity:
@@ -593,11 +592,13 @@ int main(int argc, char** argv) {
 				}
 			}
 		}
+		
 		PRINTF("From model --> Number of neurons: %i. Approx synapses: %li\n",ns,syns);
 	} else {
 		PRINTF("%i: Custom model being used\n",process_id);
 
 	}
+	
 	 
 	
 	/*
@@ -1198,7 +1199,7 @@ int main(int argc, char** argv) {
 	for(int ii=0; ii < pops.size(); ii++) {
 		population_size += pops[ii]->num_neurons;
 	}
-	
+
 	if(!MODEL_LOADED_FROM_FILE) {
 		// if the model is loaded from file, do not randomise IDs
 		// if model is created here, randomise IDs
@@ -1318,6 +1319,7 @@ int main(int argc, char** argv) {
 				int nid = conns[ii]->from->neuron_ids[jj];
 				model.interconnections_size[nid] += con_length;
 			}
+			
 		}
 		// initialise pre-synaptic neuron data structures
 		int* lastId = (int*)calloc(model.population_size,sizeof(int));
@@ -1359,6 +1361,7 @@ int main(int argc, char** argv) {
 				MPI_Send(model.interconnections[jj],model.interconnections_size[jj],MPI_INT,ii,jj,MPI_COMM_WORLD);
 			}
 		}
+		
 	} else {
 		// receive model from master node
 		// exc and inh connections
@@ -1426,7 +1429,6 @@ int main(int argc, char** argv) {
 	*/
 
 
-	
 	model.total_connections = exc + inh;
 	PRINTF("%i: Neurons: %lu, Total connections: %i (%i exc, %i inh)\n", process_id,model.population_size, model.total_connections,exc,inh);
 	
@@ -1464,7 +1466,7 @@ int main(int argc, char** argv) {
 	
 	}
 
-
+	
 	// run as many simulations as permutations of partitioning methods x comm patterns
 	// all share the same model (built previously)
 	int iterations = partitioning_methods.size() * comm_pattern_methods.size();
