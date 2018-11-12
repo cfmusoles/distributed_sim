@@ -25,7 +25,7 @@ run_experiment() {
 	SEED="$4"
 	for i in $(seq 1 $REPETITIONS)
 	do
-		aprun -n $P $APP_NAME -n $EXPERIMENT_NAME -c $COMM_PATTERN -p $DISTRIBUTION -s $SEED -k 1000 -f 200 -t 350 -m "mvc"
+		aprun -n $P $APP_NAME -n $EXPERIMENT_NAME -c $COMM_PATTERN -p $DISTRIBUTION -s $SEED -k 1000 -f 200 -t 350 -m "mvc" -i 24
 		sleep 1
 	done
 	

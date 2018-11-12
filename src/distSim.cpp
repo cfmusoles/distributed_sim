@@ -3,7 +3,7 @@
 //#define RECORD_ACTIVITY					// store neuron activity in file
 //#define RECORD_PROCESSES_ACTIVITY		// store processes timings (one file per process)
 //#define RECORD_PROCESS_TRACE			// store processes trace information (timing for compute, comm, etc.)
-//#define MEASURE_IDLE_TIME				// Separate comm into process idle (wait for others) and sync time
+#define MEASURE_IDLE_TIME				// Separate comm into process idle (wait for others) and sync time
 //#define ADVANCED_COMM_STATS				// store, for each communication, size of message
 //#define ADVANCED_COMM_STATS_MATRIX_ONLY	// only store process-to-process total messaging (not individual message size) 
 //#define VERBOSE						// display debugging information (build time)
@@ -256,6 +256,7 @@ int main(int argc, char** argv) {
 	float k_scale = 1.0;
 	int t_end = 100;
 	char* model_selected = NULL;
+	int node_size = 24;
 
 	Model model;
 	model.store_in_file = false;
@@ -265,7 +266,7 @@ int main(int argc, char** argv) {
 	extern char *optarg;
 	extern int optind, opterr, optopt;
 	int c;
-	while( (c = getopt(argc,argv,"n:c:p:s:w:Nh:b:k:f:t:m:")) != -1 ) {
+	while( (c = getopt(argc,argv,"n:c:p:s:w:Nh:b:k:f:t:m:i:")) != -1 ) {
 		switch(c) {
 			case 'n': // test name
 				sim_name = optarg;
@@ -304,6 +305,9 @@ int main(int argc, char** argv) {
 				break;
 			case 'm': // model selection
 				model_selected = optarg;
+				break;
+			case 'i': // processes per node
+				node_size = atoi(optarg);
 				break;
 		}
 	}
@@ -1304,12 +1308,13 @@ int main(int argc, char** argv) {
 	}
 
 	// construct Model from connectivity and population objects
-	// to save memory, construct only in master node, then distribute complete model
+	// to save memory, construct only in one process per node, 
+	// then distribute complete model to neighbours
 	int exc = 0, inh = 0;
 	model.population_size = population_size;
 	model.interconnections_size = (int*)calloc(model.population_size,sizeof(int));
 	model.interconnections = (int**)malloc(sizeof(int*) * model.population_size);
-	if(process_id == MASTER_NODE) {
+	if(process_id % node_size == 0) {
 		// get the number of connections per pre synaptic neuron
 		for(int ii=0; ii < conns.size(); ii++) {
 			PRINTF("%i: Creating connection set %i out of %lu\n",process_id,ii+1,conns.size());
@@ -1350,32 +1355,34 @@ int main(int argc, char** argv) {
 		free(lastId);
 
 		// send model to other processes
-		for(int ii=0; ii < num_processes; ii++) {
-			if(ii == MASTER_NODE) continue;
+		for(int ii=0; ii < node_size; ii++) {
+			int target_process = ii + process_id / node_size * node_size;
+			if(target_process == process_id) continue;
 			// exc and inh connection numbers
-			MPI_Send(&exc,1,MPI_INT,ii,0,MPI_COMM_WORLD);
-			MPI_Send(&inh,1,MPI_INT,ii,0,MPI_COMM_WORLD);
+			MPI_Send(&exc,1,MPI_INT,target_process,0,MPI_COMM_WORLD);
+			MPI_Send(&inh,1,MPI_INT,target_process,0,MPI_COMM_WORLD);
 			// model.interconnections_size
-			MPI_Send(model.interconnections_size,model.population_size,MPI_INT,ii,0,MPI_COMM_WORLD);
+			MPI_Send(model.interconnections_size,model.population_size,MPI_INT,target_process,0,MPI_COMM_WORLD);
 			for(int jj=0; jj < model.population_size; jj++) {
-				MPI_Send(model.interconnections[jj],model.interconnections_size[jj],MPI_INT,ii,jj,MPI_COMM_WORLD);
+				MPI_Send(model.interconnections[jj],model.interconnections_size[jj],MPI_INT,target_process,jj,MPI_COMM_WORLD);
 			}
 		}
 		
 	} else {
-		// receive model from master node
+		// receive model from central process in node
+		int central_process = process_id / node_size * node_size;
 		// exc and inh connections
-		MPI_Recv(&exc,1,MPI_INT,MASTER_NODE,0,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
-		MPI_Recv(&inh,1,MPI_INT,MASTER_NODE,0,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
+		MPI_Recv(&exc,1,MPI_INT,central_process,0,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
+		MPI_Recv(&inh,1,MPI_INT,central_process,0,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
 		// model.interconnections_size
-		MPI_Recv(model.interconnections_size,model.population_size,MPI_INT,MASTER_NODE,0,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
+		MPI_Recv(model.interconnections_size,model.population_size,MPI_INT,central_process,0,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
 
 		// model.interconnections
 		for(int ii=0; ii < model.population_size; ii++) {
 			model.interconnections[ii] = (int*)malloc(sizeof(int) * model.interconnections_size[ii]);
 		}
 		for(int ii=0; ii < model.population_size; ii++) {
-			MPI_Recv(model.interconnections[ii],model.interconnections_size[ii],MPI_INT,MASTER_NODE,ii,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
+			MPI_Recv(model.interconnections[ii],model.interconnections_size[ii],MPI_INT,central_process,ii,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
 		}
 		// clean up conns structure
 		for(int ii=0; ii < conns.size(); ii++) {
@@ -1383,7 +1390,7 @@ int main(int argc, char** argv) {
 		}
 		conns.clear();
 	}
-
+	
 	
 	/*int exc = 0, inh = 0;
 	model.population_size = population_size;
