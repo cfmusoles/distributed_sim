@@ -60,8 +60,8 @@
 #include "RandomPartitioning.h"
 #include "RandomBalancedPartitioning.h"
 #include "CustomPartitioning.h"
-//#include "PRAWFilePartitioning.h"
-//#include "ZoltanFilePartitioning.h"
+#include "PRAWFilePartitioning.h"
+#include "ZoltanFilePartitioning.h"
 #include "RoundRobinPartitioning.h"
 #include "Connectivity.h"
 #include "RandomConnectivity.h"
@@ -261,6 +261,7 @@ int main(int argc, char** argv) {
 	Model model;
 	model.store_in_file = false;
 	model.null_compute = false;
+	model.hypergraph_file = NULL;
 
 	// getting command line parameters
 	extern char *optarg;
@@ -384,6 +385,9 @@ int main(int argc, char** argv) {
 	PRINTF("Process %i seed %i\n",process_id,random_seed);
 	srand(random_seed);
 	
+	// cap node_size to num_processes maximum
+	if(node_size > num_processes) node_size = num_processes;
+
 	float dt = 0.1f; 					// timestep (ms)
 	//int t_end = 350; 					// simulation time (ms)
 	
@@ -399,7 +403,34 @@ int main(int argc, char** argv) {
 	//float n_scale = 0.20f; // scale number of neurons
 	//float k_scale = 1.0f;	// scale power of synapses
 	
-	if(strcmp(model_selected,"cm") == 0) {
+	if(model.hypergraph_file != NULL) {
+		// FROM FILE: hMETIS format
+		NeuronParams* c_params = (NeuronParams*)malloc(sizeof(NeuronParams));
+		// no need to set cell params (required only if !model.null_compute)
+		cell_params.push_back(c_params);
+		c_params->v_start_mean = -58.0f;		// mean start voltage (mV)
+		c_params->v_start_dev = 5.0f;		// std for start voltage (mV) was 5
+		c_params->tau_m = 10.0f;			// membrane time constant (ms) 
+		c_params->r_m = 40.0f;				// membrane resistance (MOhm) 
+		c_params->tau_ref = 2.0f;			// refractory period after spike (ms) 
+		c_params->v_rest = -45.0f;			// resting potential (mV)
+		c_params->v_thres = -50.0f;			// spike threshold (mV) 
+		c_params->v_reset = -65.0f;			// voltage after spike (mV) 
+		c_params->v_spike = 20.0f;			// nominal spiking potential (mV) (only for drawing purposes) 
+		c_params->i_offset = 0.95f;			// constant current input (nA)
+		c_params->c_m = 0.250f;				// cm (nF)
+		c_params->w_exc_mean = 0.0878f;		// nA (PyNN default is nA)
+		c_params->w_exc_dev = 0.0088f;			// nA (PyNN default is nA) was 0.0088
+		c_params->w_inh_g = -4.0f;			// g is a multiplier factor with respect to W_EXC
+		c_params->exc_tau_s = 0.5f;			// time constant for exc synapses (ms) 
+		c_params->inh_tau_s = 0.5f;		// time constant for inh synapses (ms) 
+		c_params->exc_delay_mean = 1.5f;	// delay on exc synaptic propagation (ms)
+		c_params->exc_delay_dev = 0.7f;		// delay on exc synaptic propagation (ms) was 0.7
+		c_params->inh_delay_mean = 0.8f;	// delay on inh synaptic propagation (ms)
+		c_params->inh_delay_dev = 0.4f;		// delay on inh synaptic propagation (ms) was 0.4
+		
+		load_model_from_hmetis_file(model.hypergraph_file,c_params,&pops,&conns);
+	} else if(strcmp(model_selected,"cm") == 0) {
 		// USED FOR FRONTIERS IN NEUROINFORMATICS PAPER //
 		// CORTICAL MICROCIRCUIT without injectors. To generate activity:
 		// v_rest > v_threshold
@@ -1131,34 +1162,6 @@ int main(int argc, char** argv) {
 	load_model_from_python_file("resources/v1_2_reduced.txt",c_params,&pops,&conns);
 	*/
 	
-	/*
-	// FROM FILE: hMETIS format
-	NeuronParams* c_params = (NeuronParams*)malloc(sizeof(NeuronParams));
-	// no need to set cell params (required only if !model.null_compute)
-	cell_params.push_back(c_params);
-	c_params->v_start_mean = -58.0f;		// mean start voltage (mV)
-	c_params->v_start_dev = 5.0f;		// std for start voltage (mV) was 5
-	c_params->tau_m = 10.0f;			// membrane time constant (ms) 
-	c_params->r_m = 40.0f;				// membrane resistance (MOhm) 
-	c_params->tau_ref = 2.0f;			// refractory period after spike (ms) 
-	c_params->v_rest = -45.0f;			// resting potential (mV)
-	c_params->v_thres = -50.0f;			// spike threshold (mV) 
-	c_params->v_reset = -65.0f;			// voltage after spike (mV) 
-	c_params->v_spike = 20.0f;			// nominal spiking potential (mV) (only for drawing purposes) 
-	c_params->i_offset = 0.95f;			// constant current input (nA)
-	c_params->c_m = 0.250f;				// cm (nF)
-	c_params->w_exc_mean = 0.0878f;		// nA (PyNN default is nA)
-	c_params->w_exc_dev = 0.0088f;			// nA (PyNN default is nA) was 0.0088
-	c_params->w_inh_g = -4.0f;			// g is a multiplier factor with respect to W_EXC
-	c_params->exc_tau_s = 0.5f;			// time constant for exc synapses (ms) 
-	c_params->inh_tau_s = 0.5f;		// time constant for inh synapses (ms) 
-	c_params->exc_delay_mean = 1.5f;	// delay on exc synaptic propagation (ms)
-	c_params->exc_delay_dev = 0.7f;		// delay on exc synaptic propagation (ms) was 0.7
-	c_params->inh_delay_mean = 0.8f;	// delay on inh synaptic propagation (ms)
-	c_params->inh_delay_dev = 0.4f;		// delay on inh synaptic propagation (ms) was 0.4
-	
-	load_model_from_hmetis_file(model.hypergraph_file,c_params,&pops,&conns);
-	*/
 	
 	// END OF USER INPUT //
 	
@@ -1514,13 +1517,13 @@ int main(int argc, char** argv) {
 				PRINTF("%i: Partitioning: custom\n",process_id);
 				if(custom_partitioning == NULL) partition = new RandomPartitioning(&pops,population_size);
 				else partition = new CustomPartitioning(&pops,population_size,custom_partitioning);
-			} /*else if(strcmp(part_method,"praw") == 0) {  
+			} else if(strcmp(part_method,"praw") == 0) {  
 				PRINTF("%i: Partitioning: PRAW\n",process_id);
 				partition = new PRAWFilePartitioning(&pops,population_size,comm_bandwidth_matrix_file);
 			} else if(strcmp(part_method,"zoltanFile") == 0) {  
 				PRINTF("%i: Partitioning: Zoltan from file\n",process_id);
 				partition = new ZoltanFilePartitioning(&pops,population_size);
-			} */else if(strcmp(part_method,"roundrobin") == 0) {  
+			} else if(strcmp(part_method,"roundrobin") == 0) {  
 				PRINTF("%i: Partitioning: Round robin\n",process_id);
 				partition = new RoundRobinPartitioning(&pops,population_size);
 			} else {
