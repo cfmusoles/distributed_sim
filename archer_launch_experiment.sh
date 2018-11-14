@@ -41,7 +41,6 @@ do
 	# launching trice to get three different node allocations
 	qsub $FILENAME
 	qsub $FILENAME
-	qsub $FILENAME
 	rm $FILENAME
 done
 
