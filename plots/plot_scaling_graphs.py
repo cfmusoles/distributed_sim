@@ -6,26 +6,26 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 
 geometric_scaling = True
-min_num_processes = 96
+min_num_processes = 192
 # for linear scaling of processors
 max_num_processes = 288
 process_step = 32
 #for geometric scaling of processors
-num_experiments = 4
+num_experiments = 6
 geometric_step = 2
 
 show_error = True
 as_bar_plot = False
 
-folder = "../results/azure/"
+folder = "../results/archer/mvc160/"
 # each element on the following arrays corresponds to an experiment run (collection of files)
-experiments = ["mcv_roundrobin_pex_pruned","mcv_hypergraphPartitioning_nbx_pruned"]#,"sparse_comm_st_hypergraphPartitioning_pex_pruned","sparse_comm_st_hypergraphPartitioning_nbx_pruned"] # plot more than one set of results in the graphs
+experiments = ["mvc160_roundrobin_pex","mvc160_hypergraphPartitioning_nbx"]#,"sparse_comm_st_hypergraphPartitioning_pex_pruned","sparse_comm_st_hypergraphPartitioning_nbx_pruned"] # plot more than one set of results in the graphs
 colours = ["red","green","blue","orange"] # as many as the number of experiments included
 legend_labels = ['Round Robin-PEX','HP-NBX','Hypergraph partition-PEX','Hypergraph partition-NBX']
 
 # Each element on the following arrays corresponds to a column in columns_to_plot
 columns_to_plot = [1,2,3,6,7]
-reference_values = [1,2,1,6,7] # used to take values on each column divided by these
+reference_values = [0,2,1,6,7] # used to take values on each column divided by these
 use_ref_values = False
 scale_plots = [1,1,1,1,1,1]
 plot_title = ["Simulation time","Computation time","Computation variance","Data Exchange time","Implicit sync time"]

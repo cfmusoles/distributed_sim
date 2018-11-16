@@ -6,29 +6,31 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 
 geometric_scaling = True
-min_num_processes = 96
+min_num_processes = 192
 # for linear scaling of processors
 max_num_processes = 288
 process_step = 32
 #for geometric scaling of processors
-num_experiments = 4
+num_experiments = 6
 geometric_step = 2
 colour = "green"
 
-folder = "../results/azure/"
+folder = "../results/archer/mvc160/"
 # each element on the following arrays corresponds to an experiment run (collection of files)
 # only 2 are acceptable
-experiments = ["mcv_roundrobin_pex_pruned","mcv_hypergraphPartitioning_nbx_pruned"] # plot more than one set of results in the graphs
+experiments = ["mvc160_roundrobin_pex","mvc160_hypergraphPartitioning_nbx"] # plot more than one set of results in the graphs
 legend_label = ""#HP gain over Random"
 
 # Each element on the following arrays corresponds to a column in columns_to_plot
-columns_to_plot = [17,8,23] # 8, 3, 22
-scale_plots = [0,0,0] # if 0, show difference in percentage
-plot_title = ["Remote spikes (HB-NBX over round robin)","Data volume (HP-NBX over Round robin)","ARN reduction (Round Robin vs hypergraph)"]
-plot_xlabel = ["Number of processes","Number of processes","Number of processes"]
-plot_ylabel = ["Spikes sent difference (%)","Data exchanged difference (%)","ARN difference (%)"]
+columns_to_plot = [17,8,23,0,1] # 8, 3, 22
+scale_plots = [0,0,0,1,1] # if 0, show difference in percentage
+reference_values = [17,8,23,0,0] # used to take values on each column divided by these
+use_ref_values = False
+plot_title = ["Remote spikes (HB-NBX over round robin)","Data volume (HP-NBX over Round robin)","ARN reduction (Round Robin vs hypergraph)","Build time cost (HB-NBX over round robin)","Simulation time gain (HB-NBX over round robin)"]
+plot_xlabel = ["Number of processes","Number of processes","Number of processes","Number of processes","Number of processes"]
+plot_ylabel = ["Spikes sent difference (%)","Data exchanged difference (%)","ARN difference (%)","Time loss (s)","Time gain (% of build cost)"]
 image_format = 'pdf'
-plot_name = ["a1","a2","a3"]
+plot_name = ["a1","a2","a3","a4","a5"]
 
 # general plot settings
 plt.rcParams['figure.facecolor'] = 'white'
@@ -62,7 +64,7 @@ def plot(x,y, error,title,xlabel,ylabel,name,colour,legend):
 	plt.xticks([e*1.25 for e in experiment_range],experiment_range)
 	plt.tick_params(axis='x',which='minor',bottom=False,labelbottom=False)
 	plt.title(title)
-	#plt.ylim(0,50)
+	#plt.ylim(0,100)
 	if not legend == "":
 		plt.legend(loc=1)
 	plt.savefig(name + "." + image_format,format=image_format,dpi=1000)
@@ -97,6 +99,8 @@ for i in range(len(columns_to_plot)):
 			comp = (data1[:,columns_to_plot[i]] - data2[:,columns_to_plot[i]]) / data1[:,columns_to_plot[i]] * 100
 		else:
 			comp = data1[:,columns_to_plot[i]] - data2[:,columns_to_plot[i]]
+		if use_ref_values:
+			comp = comp / ( data2[:,reference_values[i]] - data1[:,reference_values[i]] ) * 100
 		means[i].append(np.mean( comp ))
 	
 	#plot each column separately

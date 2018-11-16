@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 
 geometric_scaling = True
-min_num_processes = 96
+min_num_processes = 192
 # for linear scaling of processors
 max_num_processes = 288
 process_step = 32
@@ -15,14 +15,14 @@ num_experiments = 6
 geometric_step = 2
 colour = "green"
 
-folder = "../results/archer/data/"
+folder = "../results/archer/mvc160/"
 # first experiment is the baseline
-experiments = ["hpart_strong_random_pex","dsde_idle_st_hypergraphPartitioning_nbx"]
+experiments = ["mvc160_roundrobin_pex","mvc160_hypergraphPartitioning_nbx"]
 legend_label = "NBX gain over PEX"
 
 # Use the baseline column (y axis) to plot improvements on compared column
-baseline_column = 22
-compared_column = 6
+baseline_column = 0
+compared_column = 1
 plot_title = "Correlation between runtime neighbours and sync time"
 plot_xlabel = "Difference in runtime neighbours"
 plot_ylabel = "Sync time improvement"
