@@ -15,7 +15,7 @@ num_experiments = 6
 geometric_step = 2
 
 show_error = True
-as_bar_plot = False
+as_bar_plot = True
 
 folder = "../results/archer/mvc160/"
 # each element on the following arrays corresponds to an experiment run (collection of files)
@@ -24,15 +24,15 @@ colours = ["red","green","blue","orange"] # as many as the number of experiments
 legend_labels = ['Round Robin-PEX','HP-NBX','Hypergraph partition-PEX','Hypergraph partition-NBX']
 
 # Each element on the following arrays corresponds to a column in columns_to_plot
-columns_to_plot = [1,2,3,6,7]
-reference_values = [0,2,1,6,7] # used to take values on each column divided by these
+columns_to_plot = [1,2,3,6,7,8,23]
+reference_values = [0,2,1,6,7,8,23] # used to take values on each column divided by these
 use_ref_values = False
-scale_plots = [1,1,1,1,1,1]
-plot_title = ["Simulation time","Computation time","Computation variance","Data Exchange time","Implicit sync time"]
-plot_xlabel = ["Number of processes","Number of processes","Number of processes","Number of processes","Number of processes","Number of processes"]
-plot_ylabel = ["Time(s)","Time(s)","Variance","Time(s)","Time(s)","Time(s)"]
+scale_plots = [1,1,1,1,1,1e-9,1]
+plot_title = ["Simulation time","Computation time","Computation variance","Data Exchange time","Implicit sync time","Data volume","Average Runtime Neighbours"]
+plot_xlabel = ["Number of processes","Number of processes","Number of processes","Number of processes","Number of processes","Number of processes","Number of processes"]
+plot_ylabel = ["Time(s)","Time(s)","Variance","Time(s)","Time(s)","Data exchanged (GB)","ARN ratio"]
 image_format = 'pdf'
-plot_name = ["a1","a2","a3","a4","a5"]
+plot_name = ['a' + str(x) for x in range(len(columns_to_plot))] #["a1","a2","a3","a4","a5","a6","a7"]
 
 bar_plot_size = 0.5 / len(experiments)
 

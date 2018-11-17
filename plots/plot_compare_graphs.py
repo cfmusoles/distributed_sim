@@ -30,7 +30,8 @@ plot_title = ["Remote spikes (HB-NBX over round robin)","Data volume (HP-NBX ove
 plot_xlabel = ["Number of processes","Number of processes","Number of processes","Number of processes","Number of processes"]
 plot_ylabel = ["Spikes sent difference (%)","Data exchanged difference (%)","ARN difference (%)","Time loss (s)","Time gain (% of build cost)"]
 image_format = 'pdf'
-plot_name = ["a1","a2","a3","a4","a5"]
+plot_name = ['a' + str(x) for x in range(len(columns_to_plot))] #["a1","a2","a3","a4","a5","a6","a7"]
+
 
 # general plot settings
 plt.rcParams['figure.facecolor'] = 'white'
