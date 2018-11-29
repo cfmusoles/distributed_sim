@@ -5,7 +5,7 @@ from matplotlib.ticker import ScalarFormatter
 import matplotlib.gridspec as gridspec
 
 folder = "../"
-experiments = ["test_comm_sizes","test_nbx_comm_sizes"]
+experiments = ["test_comm_sizes"]
 colours= ['blue','yellow']
 legends = ['Random','Partition']
 num_processes = 4

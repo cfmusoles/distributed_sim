@@ -16,8 +16,9 @@
 class PRAWFilePartitioning : public Partitioning {
 public:
 	
-	PRAWFilePartitioning(std::vector<Population*>* pops, int population_size, char* comm_bandwidth_file) : Partitioning(pops,population_size) {
+	PRAWFilePartitioning(std::vector<Population*>* pops, int population_size, char* comm_bandwidth_file, bool parallel) : Partitioning(pops,population_size) {
 		comm_bandwidth_filename = comm_bandwidth_file;
+        isParallel = parallel;
 	}
 	virtual ~PRAWFilePartitioning() {}
 	
@@ -78,7 +79,18 @@ public:
 
         PRAW::get_comm_cost_matrix_from_bandwidth(comm_bandwidth_filename,comm_cost_matrix,partitions);
         
-        PRAW::SequentialStreamingPartitioning(partitioning,comm_cost_matrix, model->population_size,&hyperedges,&hedge_ptr,vtx_wgt,max_iterations, imbalance_tolerance);
+        std::string filename = model->hypergraph_file;
+        if(isParallel) {
+            filename += "_prawParallel";
+            PRAW::ParallelStreamingPartitioning(partitioning,comm_cost_matrix, model->population_size,&hyperedges,&hedge_ptr,vtx_wgt,max_iterations, imbalance_tolerance);
+        } else {
+            filename += "_prawSequential";
+            PRAW::SequentialStreamingPartitioning(partitioning,comm_cost_matrix, model->population_size,&hyperedges,&hedge_ptr,vtx_wgt,max_iterations, imbalance_tolerance);
+        }
+
+        if(process_id == 0) {
+            PRAW::storePartitionStats(filename,partitioning,partitions,model->population_size,&hyperedges,&hedge_ptr,vtx_wgt,comm_cost_matrix);
+        }
 
         free(vtx_wgt);
         for(int ii=0; ii < partitions; ii++) {
@@ -90,6 +102,7 @@ public:
 
 private:
     char* comm_bandwidth_filename = NULL;
+    bool isParallel = false;
 };
 
 

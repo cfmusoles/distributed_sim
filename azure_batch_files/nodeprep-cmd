@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+#Command script to run on all nodes as Azure Batch node start task, to install prerequisites etc.
+#sudo apt-get update
+#sudo apt-get install -y libopenmpi-dev openmpi-bin libhdf5-openmpi-dev g++ make #python-pip 
+#sudo apt-get install -y g++ make #python-pip 
+#pip install --user azure-storage
+
+#to be used to run python on azure to download results
+#yum -y install python-pip
+#pip install azure-storage
+
+
+
+
+
+

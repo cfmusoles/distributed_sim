@@ -165,8 +165,11 @@ public:
 		MPI_Allreduce(partAssign,partitioning,model->population_size,MPI_LONG,MPI_MAX,MPI_COMM_WORLD);
 		free(partAssign);
 
-		PRAW::printPartitionStats(partitioning,partitions,model->population_size,&hyperedges,&hedge_ptr,NULL,NULL);
-
+		if(process_id == 0) {
+            std::string filename = model->hypergraph_file;
+			filename += "_zoltanFile";
+            PRAW::storePartitionStats(filename,partitioning,partitions,model->population_size,&hyperedges,&hedge_ptr,NULL,NULL);
+        }
 		Zoltan_LB_Free_Part(&importGlobalGids, &importLocalGids, 
 						&importProcs, &importToPart);
 		Zoltan_LB_Free_Part(&exportGlobalGids, &exportLocalGids, 

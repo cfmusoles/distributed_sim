@@ -8,21 +8,21 @@ from mpl_toolkits.mplot3d import Axes3D
 from matplotlib.ticker import LinearLocator, FormatStrFormatter
 from pylab import *
 
-num_processes = 192
-plot_bandwidth = True 			# plot network bandwidth data
+num_processes = 96
+plot_bandwidth = True			# plot network bandwidth data
 plot_sent_data = False			# plot application sent data
 plot_comm_cost = False			# plot combined comm cost
 storeResults = False
 
-folder = "../"
-bandwidth_send_experiment_name = 'test_3_mpi_send_bandwidth_' + str(num_processes)
+folder = "../../hyperPraw/"
+bandwidth_send_experiment_name = 'network_profile_mpi_send_bandwidth_' + str(num_processes)
 #bandwidth_recv_experiment_name = 'results_mpi_recv_bandwidth_' + str(num_processes)
-sim_sent_experiment = 'test_hypergraphPartitioning_nbx_comm_matrix_' + str(num_processes)
+sim_sent_experiment = 'praw_test_tcp_withbandwidth_prawS_nbx_comm_matrix_' + str(num_processes)
 
 xlabel = "Process"
 ylabel = "Process"
 zlabels = ["MB/sec","Bytes"]
-titles = ["Bandwidth on P2P communication","Sent data in simulation","Cost of communication"]
+titles = ["P2P Bandwidth (praw-noB)","Sent data (praw-withB)","Cost of communication (praw-withB)"]
 filenames = ["a1","a2","a3"]
 image_format = 'pdf'
 

@@ -1,0 +1,117 @@
+#!/usr/bin/env bash
+
+# Command script to run distSim application on multiple machines as MPI task on Azure Batch.
+
+NUM_NODES=$1
+PROCESS_PER_NODE=$2
+AZ_BATCH_TASK_SHARED_DIR=$3
+AZ_BATCH_HOST_LIST=$4
+RESULTS_NAME=$5
+COMM_PROTOCOL=$6
+DISTRIBUTION=$7
+GLOBAL_SEED=$8
+
+
+# total number of processes is number of nodes multipled by number of processes per node
+(( numProc = $NUM_NODES * $PROCESS_PER_NODE ))
+
+# environment variables
+#export PATH="/home/openmpi-3.1.1/build/bin:$PATH"
+#export LD_LIBRARY_PATH="/home/openmpi-3.1.1/build/lib/:$LD_LIBRARY_PATH"
+export PATH="$PATH:/home/qt_build/bin"
+export PATH="$PATH:/home/scorep-3.0/build/bin"
+export PATH="$PATH:/home/cube-4.3.4/build/bin"
+export PATH="$PATH:/home/scalasca2_build/bin"
+
+# if using Intel MPI + RDMA
+#source /opt/intel/impi/2017.3.196/bin64/mpivars.sh
+source /opt/intel/impi/5.1.3.223/bin64/mpivars.sh
+export I_MPI_SHM_LMT=shm
+# can use tcp (if only one fabric stated, it is used for intra and inter node comm)
+export I_MPI_FABRICS=dapl	# RDMA (dapl), normal (tcp), shared mem (shm)
+# THIS IS A MANDATORY ENVIRONMENT VARIABLE AND MUST BE SET BEFORE RUNNING ANY JOB
+# Setting the variable to shm:dapl gives best performance for some applications
+# If your application doesn’t take advantage of shared memory and MPI together, then set only dapl
+export I_MPI_DAPL_PROVIDER=ofa-v2-ib0
+# THIS IS A MANDATORY ENVIRONMENT VARIABLE AND MUST BE SET BEFORE RUNNING ANY JOB
+export I_MPI_DYNAMIC_CONNECTION=0
+export I_MPI_FALLBACK=1
+export I_MPI_DEBUG=0
+export I_MPI_JOB_RESPECT_PROCESS_PLACEMENT=0
+export I_MPI_PERHOST=$PROCESS_PER_NODE
+###############
+
+hostList=$(echo $AZ_BATCH_HOST_LIST | tr "," "\n")
+
+HOST_LIST=""
+for addr in $hostList
+do
+    HOST_LIST=$HOST_LIST$addr":"$PROCESS_PER_NODE","
+done
+
+
+
+# BATCHED EXPERIMENT
+ITERATIONS=1 # how many different seeds used
+REPETITIONS=1 # how many times each individual experiment (single seed) is repeated
+
+run_partitioning_experiment() {
+	echo "Another experiment"
+	MODEL_NAME="$1"
+	COMM_PATTERN="$2"
+	PARTITIONING="$3"
+	SEED="$4"
+	if [ $5 == "yes" ]
+	then
+		#RESULTS=$MODEL_NAME"_"$COMM_PATTERN"_"$PARTITIONING"_repartition"
+		RESULTS=$MODEL_NAME"_repartition"
+	else
+		#RESULTS=$MODEL_NAME"_"$COMM_PATTERN"_"$PARTITIONING
+		RESULTS=$MODEL_NAME
+	fi
+	
+	if [ $5 == "yes" ]
+	then
+		ACTIVITY_FILE="-w "$AZ_BATCH_TASK_SHARED_DIR"/"$MODEL_NAME"_"$COMM_PATTERN"_"$PARTITIONING"__"$numProc"_neuron_activity"
+	else
+		ACTIVITY_FILE=""
+	fi
+	
+	for i in $(seq 1 $REPETITIONS)
+	do
+		#if using OpenMPI
+		#	mpirun --prefix /home/openmpi-3.1.1/build -np $numProc --host $HOST_LIST --map-by ppr:$PROCESS_PER_NODE:node --nooversubscribe -wdir $AZ_BATCH_TASK_SHARED_DIR $AZ_BATCH_TASK_SHARED_DIR/distSim -n $RESULTS -c $COMM_PATTERN -p $PARTITIONING -s $SEED -k 1000 -f 200 -t 100 -m "mvc" $ACTIVITY_FILE
+
+		#if using Intel MPI
+		mpirun -n $numProc -ppn $PROCESS_PER_NODE --host $HOST_LIST -wdir $AZ_BATCH_TASK_SHARED_DIR $AZ_BATCH_TASK_SHARED_DIR/distSim -n $RESULTS -c $COMM_PATTERN -p $PARTITIONING -s $SEED -k 1000 -f 20 -t 150 -m "mvc" $ACTIVITY_FILE
+		sleep 1
+	done
+}
+
+#needed to fill pipeline (otherwise first run suffers from low MPI communication speed)
+#openMPI
+#mpirun --prefix /home/openmpi-3.1.1/build -np $numProc --host $HOST_LIST --map-by ppr:$PROCESS_PER_NODE:node --nooversubscribe -wdir $AZ_BATCH_TASK_SHARED_DIR $AZ_BATCH_TASK_SHARED_DIR/hello_world
+#intel MPI
+echo "Warming pipeline"
+mpirun -n $numProc -ppn $PROCESS_PER_NODE --host $HOST_LIST -wdir $AZ_BATCH_TASK_SHARED_DIR $AZ_BATCH_TASK_SHARED_DIR/hello_world
+
+sleep 10
+
+for i in $(seq 1 $ITERATIONS)
+do
+	echo "Iteration $i"
+	RND=$RANDOM
+	run_partitioning_experiment $RESULTS_NAME "pex" "roundrobin" $RND "no"
+	#run_partitioning_experiment $RESULTS_NAME "nbx" "hypergraphPartitioning" $RND "no"
+done
+
+
+
+# prepare the output and compress it as result
+mkdir results
+cp $AZ_BATCH_TASK_SHARED_DIR/$RESULTS_NAME* results/
+rm -f "$AZ_BATCH_TASK_SHARED_DIR/RESULTS.tgz"
+cd results
+tar -czf "$AZ_BATCH_TASK_SHARED_DIR/RESULTS.tgz" *
+exit
+

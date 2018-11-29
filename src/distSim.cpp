@@ -3,11 +3,11 @@
 //#define RECORD_ACTIVITY					// store neuron activity in file
 //#define RECORD_PROCESSES_ACTIVITY		// store processes timings (one file per process)
 //#define RECORD_PROCESS_TRACE			// store processes trace information (timing for compute, comm, etc.)
-#define MEASURE_IDLE_TIME				// Separate comm into process idle (wait for others) and sync time
+//#define MEASURE_IDLE_TIME				// Separate comm into process idle (wait for others) and sync time
 //#define ADVANCED_COMM_STATS				// store, for each communication, size of message
-//#define ADVANCED_COMM_STATS_MATRIX_ONLY	// only store process-to-process total messaging (not individual message size) 
+#define ADVANCED_COMM_STATS_MATRIX_ONLY	// only store process-to-process total messaging (not individual message size) 
 //#define VERBOSE						// display debugging information (build time)
-//#define PARTITION_CONNECTIVITY_GRAPH	// store partition connectivity graph
+#define PARTITION_CONNECTIVITY_GRAPH	// store partition connectivity graph
 					
 
 // TODO
@@ -313,7 +313,7 @@ int main(int argc, char** argv) {
 		}
 	}
 
-	if(model_selected == NULL) {
+	if(model.hypergraph_file == NULL && model_selected == NULL) {
 		printf("Error, model has not been selected. Use -m parameter to select model ('-m cm' or '-m mcv'\n");
 		MPI_Finalize();
 		return 0;
@@ -1517,9 +1517,12 @@ int main(int argc, char** argv) {
 				PRINTF("%i: Partitioning: custom\n",process_id);
 				if(custom_partitioning == NULL) partition = new RandomPartitioning(&pops,population_size);
 				else partition = new CustomPartitioning(&pops,population_size,custom_partitioning);
-			} else if(strcmp(part_method,"praw") == 0) {  
-				PRINTF("%i: Partitioning: PRAW\n",process_id);
-				partition = new PRAWFilePartitioning(&pops,population_size,comm_bandwidth_matrix_file);
+			} else if(strcmp(part_method,"prawS") == 0) {  
+				PRINTF("%i: Partitioning: sequential PRAW\n",process_id);
+				partition = new PRAWFilePartitioning(&pops,population_size,comm_bandwidth_matrix_file,false);
+			} else if(strcmp(part_method,"prawP") == 0) {  
+				PRINTF("%i: Partitioning: parallel PRAW\n",process_id);
+				partition = new PRAWFilePartitioning(&pops,population_size,comm_bandwidth_matrix_file,true);
 			} else if(strcmp(part_method,"zoltanFile") == 0) {  
 				PRINTF("%i: Partitioning: Zoltan from file\n",process_id);
 				partition = new ZoltanFilePartitioning(&pops,population_size);
