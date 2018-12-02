@@ -60,8 +60,6 @@
 #include "RandomPartitioning.h"
 #include "RandomBalancedPartitioning.h"
 #include "CustomPartitioning.h"
-//#include "PRAWFilePartitioning.h"
-//#include "ZoltanFilePartitioning.h"
 #include "RoundRobinPartitioning.h"
 #include "Connectivity.h"
 #include "RandomConnectivity.h"
@@ -256,16 +254,18 @@ int main(int argc, char** argv) {
 	float k_scale = 1.0;
 	int t_end = 100;
 	char* model_selected = NULL;
+	int node_size = 24;
 
 	Model model;
 	model.store_in_file = false;
 	model.null_compute = false;
+	model.hypergraph_file = NULL;
 
 	// getting command line parameters
 	extern char *optarg;
 	extern int optind, opterr, optopt;
 	int c;
-	while( (c = getopt(argc,argv,"n:c:p:s:w:Nh:b:k:f:t:m:")) != -1 ) {
+	while( (c = getopt(argc,argv,"n:c:p:s:w:Nh:b:k:f:t:m:i:")) != -1 ) {
 		switch(c) {
 			case 'n': // test name
 				sim_name = optarg;
@@ -305,10 +305,13 @@ int main(int argc, char** argv) {
 			case 'm': // model selection
 				model_selected = optarg;
 				break;
+			case 'i': // processes per node
+				node_size = atoi(optarg);
+				break;
 		}
 	}
 
-	if(model_selected == NULL) {
+	if(model.hypergraph_file == NULL && model_selected == NULL) {
 		printf("Error, model has not been selected. Use -m parameter to select model ('-m cm' or '-m mcv'\n");
 		MPI_Finalize();
 		return 0;
@@ -380,6 +383,9 @@ int main(int argc, char** argv) {
 	PRINTF("Process %i seed %i\n",process_id,random_seed);
 	srand(random_seed);
 	
+	// cap node_size to num_processes maximum
+	if(node_size > num_processes) node_size = num_processes;
+
 	float dt = 0.1f; 					// timestep (ms)
 	//int t_end = 350; 					// simulation time (ms)
 	
@@ -395,8 +401,34 @@ int main(int argc, char** argv) {
 	//float n_scale = 0.20f; // scale number of neurons
 	//float k_scale = 1.0f;	// scale power of synapses
 	
-
-	if(strcmp(model_selected,"cm") == 0) {
+	if(model.hypergraph_file != NULL) {
+		// FROM FILE: hMETIS format
+		NeuronParams* c_params = (NeuronParams*)malloc(sizeof(NeuronParams));
+		// no need to set cell params (required only if !model.null_compute)
+		cell_params.push_back(c_params);
+		c_params->v_start_mean = -58.0f;		// mean start voltage (mV)
+		c_params->v_start_dev = 5.0f;		// std for start voltage (mV) was 5
+		c_params->tau_m = 10.0f;			// membrane time constant (ms) 
+		c_params->r_m = 40.0f;				// membrane resistance (MOhm) 
+		c_params->tau_ref = 2.0f;			// refractory period after spike (ms) 
+		c_params->v_rest = -45.0f;			// resting potential (mV)
+		c_params->v_thres = -50.0f;			// spike threshold (mV) 
+		c_params->v_reset = -65.0f;			// voltage after spike (mV) 
+		c_params->v_spike = 20.0f;			// nominal spiking potential (mV) (only for drawing purposes) 
+		c_params->i_offset = 0.95f;			// constant current input (nA)
+		c_params->c_m = 0.250f;				// cm (nF)
+		c_params->w_exc_mean = 0.0878f;		// nA (PyNN default is nA)
+		c_params->w_exc_dev = 0.0088f;			// nA (PyNN default is nA) was 0.0088
+		c_params->w_inh_g = -4.0f;			// g is a multiplier factor with respect to W_EXC
+		c_params->exc_tau_s = 0.5f;			// time constant for exc synapses (ms) 
+		c_params->inh_tau_s = 0.5f;		// time constant for inh synapses (ms) 
+		c_params->exc_delay_mean = 1.5f;	// delay on exc synaptic propagation (ms)
+		c_params->exc_delay_dev = 0.7f;		// delay on exc synaptic propagation (ms) was 0.7
+		c_params->inh_delay_mean = 0.8f;	// delay on inh synaptic propagation (ms)
+		c_params->inh_delay_dev = 0.4f;		// delay on inh synaptic propagation (ms) was 0.4
+		
+		load_model_from_hmetis_file(model.hypergraph_file,c_params,&pops,&conns);
+	} else if(strcmp(model_selected,"cm") == 0) {
 		// USED FOR FRONTIERS IN NEUROINFORMATICS PAPER //
 		// CORTICAL MICROCIRCUIT without injectors. To generate activity:
 		// v_rest > v_threshold
@@ -505,7 +537,7 @@ int main(int argc, char** argv) {
 		c_params->inh_delay_dev = 0.4f;		// delay on inh synaptic propagation (ms) was 0.4
 
 		// json examples and doc https://en.wikibooks.org/wiki/JsonCpp
-		std::ifstream ifs("multiareaModel.json");
+		std::ifstream ifs("resources/multiareaModel.json");
 		Json::Reader reader;
 		Json::Value root;
 		reader.parse(ifs, root); // reader can also read strings
@@ -593,11 +625,13 @@ int main(int argc, char** argv) {
 				}
 			}
 		}
+		
 		PRINTF("From model --> Number of neurons: %i. Approx synapses: %li\n",ns,syns);
 	} else {
 		PRINTF("%i: Custom model being used\n",process_id);
 
 	}
+	
 	 
 	
 	/*
@@ -1126,34 +1160,6 @@ int main(int argc, char** argv) {
 	load_model_from_python_file("resources/v1_2_reduced.txt",c_params,&pops,&conns);
 	*/
 	
-	/*
-	// FROM FILE: hMETIS format
-	NeuronParams* c_params = (NeuronParams*)malloc(sizeof(NeuronParams));
-	// no need to set cell params (required only if !model.null_compute)
-	cell_params.push_back(c_params);
-	c_params->v_start_mean = -58.0f;		// mean start voltage (mV)
-	c_params->v_start_dev = 5.0f;		// std for start voltage (mV) was 5
-	c_params->tau_m = 10.0f;			// membrane time constant (ms) 
-	c_params->r_m = 40.0f;				// membrane resistance (MOhm) 
-	c_params->tau_ref = 2.0f;			// refractory period after spike (ms) 
-	c_params->v_rest = -45.0f;			// resting potential (mV)
-	c_params->v_thres = -50.0f;			// spike threshold (mV) 
-	c_params->v_reset = -65.0f;			// voltage after spike (mV) 
-	c_params->v_spike = 20.0f;			// nominal spiking potential (mV) (only for drawing purposes) 
-	c_params->i_offset = 0.95f;			// constant current input (nA)
-	c_params->c_m = 0.250f;				// cm (nF)
-	c_params->w_exc_mean = 0.0878f;		// nA (PyNN default is nA)
-	c_params->w_exc_dev = 0.0088f;			// nA (PyNN default is nA) was 0.0088
-	c_params->w_inh_g = -4.0f;			// g is a multiplier factor with respect to W_EXC
-	c_params->exc_tau_s = 0.5f;			// time constant for exc synapses (ms) 
-	c_params->inh_tau_s = 0.5f;		// time constant for inh synapses (ms) 
-	c_params->exc_delay_mean = 1.5f;	// delay on exc synaptic propagation (ms)
-	c_params->exc_delay_dev = 0.7f;		// delay on exc synaptic propagation (ms) was 0.7
-	c_params->inh_delay_mean = 0.8f;	// delay on inh synaptic propagation (ms)
-	c_params->inh_delay_dev = 0.4f;		// delay on inh synaptic propagation (ms) was 0.4
-	
-	load_model_from_hmetis_file(model.hypergraph_file,c_params,&pops,&conns);
-	*/
 	
 	// END OF USER INPUT //
 	
@@ -1198,7 +1204,7 @@ int main(int argc, char** argv) {
 	for(int ii=0; ii < pops.size(); ii++) {
 		population_size += pops[ii]->num_neurons;
 	}
-	
+
 	if(!MODEL_LOADED_FROM_FILE) {
 		// if the model is loaded from file, do not randomise IDs
 		// if model is created here, randomise IDs
@@ -1303,12 +1309,13 @@ int main(int argc, char** argv) {
 	}
 
 	// construct Model from connectivity and population objects
-	// to save memory, construct only in master node, then distribute complete model
+	// to save memory, construct only in one process per node, 
+	// then distribute complete model to neighbours
 	int exc = 0, inh = 0;
 	model.population_size = population_size;
 	model.interconnections_size = (int*)calloc(model.population_size,sizeof(int));
 	model.interconnections = (int**)malloc(sizeof(int*) * model.population_size);
-	if(process_id == MASTER_NODE) {
+	if(process_id % node_size == 0) {
 		// get the number of connections per pre synaptic neuron
 		for(int ii=0; ii < conns.size(); ii++) {
 			PRINTF("%i: Creating connection set %i out of %lu\n",process_id,ii+1,conns.size());
@@ -1318,6 +1325,7 @@ int main(int argc, char** argv) {
 				int nid = conns[ii]->from->neuron_ids[jj];
 				model.interconnections_size[nid] += con_length;
 			}
+			
 		}
 		// initialise pre-synaptic neuron data structures
 		int* lastId = (int*)calloc(model.population_size,sizeof(int));
@@ -1348,31 +1356,34 @@ int main(int argc, char** argv) {
 		free(lastId);
 
 		// send model to other processes
-		for(int ii=0; ii < num_processes; ii++) {
-			if(ii == MASTER_NODE) continue;
+		for(int ii=0; ii < node_size; ii++) {
+			int target_process = ii + process_id / node_size * node_size;
+			if(target_process == process_id) continue;
 			// exc and inh connection numbers
-			MPI_Send(&exc,1,MPI_INT,ii,0,MPI_COMM_WORLD);
-			MPI_Send(&inh,1,MPI_INT,ii,0,MPI_COMM_WORLD);
+			MPI_Send(&exc,1,MPI_INT,target_process,0,MPI_COMM_WORLD);
+			MPI_Send(&inh,1,MPI_INT,target_process,0,MPI_COMM_WORLD);
 			// model.interconnections_size
-			MPI_Send(model.interconnections_size,model.population_size,MPI_INT,ii,0,MPI_COMM_WORLD);
+			MPI_Send(model.interconnections_size,model.population_size,MPI_INT,target_process,0,MPI_COMM_WORLD);
 			for(int jj=0; jj < model.population_size; jj++) {
-				MPI_Send(model.interconnections[jj],model.interconnections_size[jj],MPI_INT,ii,jj,MPI_COMM_WORLD);
+				MPI_Send(model.interconnections[jj],model.interconnections_size[jj],MPI_INT,target_process,jj,MPI_COMM_WORLD);
 			}
 		}
+		
 	} else {
-		// receive model from master node
+		// receive model from central process in node
+		int central_process = process_id / node_size * node_size;
 		// exc and inh connections
-		MPI_Recv(&exc,1,MPI_INT,MASTER_NODE,0,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
-		MPI_Recv(&inh,1,MPI_INT,MASTER_NODE,0,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
+		MPI_Recv(&exc,1,MPI_INT,central_process,0,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
+		MPI_Recv(&inh,1,MPI_INT,central_process,0,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
 		// model.interconnections_size
-		MPI_Recv(model.interconnections_size,model.population_size,MPI_INT,MASTER_NODE,0,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
+		MPI_Recv(model.interconnections_size,model.population_size,MPI_INT,central_process,0,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
 
 		// model.interconnections
 		for(int ii=0; ii < model.population_size; ii++) {
 			model.interconnections[ii] = (int*)malloc(sizeof(int) * model.interconnections_size[ii]);
 		}
 		for(int ii=0; ii < model.population_size; ii++) {
-			MPI_Recv(model.interconnections[ii],model.interconnections_size[ii],MPI_INT,MASTER_NODE,ii,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
+			MPI_Recv(model.interconnections[ii],model.interconnections_size[ii],MPI_INT,central_process,ii,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
 		}
 		// clean up conns structure
 		for(int ii=0; ii < conns.size(); ii++) {
@@ -1380,7 +1391,7 @@ int main(int argc, char** argv) {
 		}
 		conns.clear();
 	}
-
+	
 	
 	/*int exc = 0, inh = 0;
 	model.population_size = population_size;
@@ -1426,7 +1437,6 @@ int main(int argc, char** argv) {
 	*/
 
 
-	
 	model.total_connections = exc + inh;
 	PRINTF("%i: Neurons: %lu, Total connections: %i (%i exc, %i inh)\n", process_id,model.population_size, model.total_connections,exc,inh);
 	
@@ -1464,7 +1474,7 @@ int main(int argc, char** argv) {
 	
 	}
 
-
+	
 	// run as many simulations as permutations of partitioning methods x comm patterns
 	// all share the same model (built previously)
 	int iterations = partitioning_methods.size() * comm_pattern_methods.size();
@@ -1505,13 +1515,7 @@ int main(int argc, char** argv) {
 				PRINTF("%i: Partitioning: custom\n",process_id);
 				if(custom_partitioning == NULL) partition = new RandomPartitioning(&pops,population_size);
 				else partition = new CustomPartitioning(&pops,population_size,custom_partitioning);
-			} /*else if(strcmp(part_method,"praw") == 0) {  
-				PRINTF("%i: Partitioning: PRAW\n",process_id);
-				partition = new PRAWFilePartitioning(&pops,population_size,comm_bandwidth_matrix_file);
-			} else if(strcmp(part_method,"zoltanFile") == 0) {  
-				PRINTF("%i: Partitioning: Zoltan from file\n",process_id);
-				partition = new ZoltanFilePartitioning(&pops,population_size);
-			} */else if(strcmp(part_method,"roundrobin") == 0) {  
+			} else if(strcmp(part_method,"roundrobin") == 0) {  
 				PRINTF("%i: Partitioning: Round robin\n",process_id);
 				partition = new RoundRobinPartitioning(&pops,population_size);
 			} else {
