@@ -72,9 +72,9 @@ public:
         }
 
         // p2p communication cost estimates from file
-        float** comm_cost_matrix = (float**)malloc(sizeof(float*) * partitions);
+        double** comm_cost_matrix = (double**)malloc(sizeof(double*) * partitions);
         for(int ii=0; ii < partitions; ii++) {
-            comm_cost_matrix[ii] = (float*)calloc(partitions,sizeof(float));
+            comm_cost_matrix[ii] = (double*)calloc(partitions,sizeof(double));
         }
 
         PRAW::get_comm_cost_matrix_from_bandwidth(comm_bandwidth_filename,comm_cost_matrix,partitions);

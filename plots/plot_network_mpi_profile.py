@@ -8,16 +8,15 @@ from mpl_toolkits.mplot3d import Axes3D
 from matplotlib.ticker import LinearLocator, FormatStrFormatter
 from pylab import *
 
-num_processes = 96
-plot_bandwidth = True			# plot network bandwidth data
+num_processes = 16
+plot_bandwidth = False			# plot network bandwidth data
 plot_sent_data = False			# plot application sent data
-plot_comm_cost = False			# plot combined comm cost
+plot_comm_cost = True			# plot combined comm cost
 storeResults = False
 
 folder = "../../hyperPraw/"
 bandwidth_send_experiment_name = 'network_profile_mpi_send_bandwidth_' + str(num_processes)
-#bandwidth_recv_experiment_name = 'results_mpi_recv_bandwidth_' + str(num_processes)
-sim_sent_experiment = 'praw_test_tcp_withbandwidth_prawS_nbx_comm_matrix_' + str(num_processes)
+sim_sent_experiment = 'without_prediction_comm_matrix_' + str(num_processes)
 
 xlabel = "Process"
 ylabel = "Process"
@@ -90,6 +89,7 @@ if plot_comm_cost:
 	comm_data = get_data_from_csv(folder + sim_sent_experiment,' ')
 	cost_data = np.array([c/b for b, c in zip(bandwidth_data, comm_data)])
 	cost_data = np.nan_to_num(cost_data)
+	print('Total cost: ' + str(cost_data.sum()))
 	# colour maps http://scipy-cookbook.readthedocs.io/items/Matplotlib_Show_colormaps.html
 	pcolor(cost_data,cmap=get_cmap("binary"))
 	cbar = colorbar()
