@@ -1517,12 +1517,18 @@ int main(int argc, char** argv) {
 				PRINTF("%i: Partitioning: custom\n",process_id);
 				if(custom_partitioning == NULL) partition = new RandomPartitioning(&pops,population_size);
 				else partition = new CustomPartitioning(&pops,population_size,custom_partitioning);
+			} else if(strcmp(part_method,"prawS_without") == 0) {  
+				PRINTF("%i: Partitioning: sequential PRAW\n",process_id);
+				partition = new PRAWFilePartitioning(&pops,population_size,comm_bandwidth_matrix_file,false,false);
+			} else if(strcmp(part_method,"prawP_without") == 0) {  
+				PRINTF("%i: Partitioning: parallel PRAW\n",process_id);
+				partition = new PRAWFilePartitioning(&pops,population_size,comm_bandwidth_matrix_file,true,false);
 			} else if(strcmp(part_method,"prawS") == 0) {  
 				PRINTF("%i: Partitioning: sequential PRAW\n",process_id);
-				partition = new PRAWFilePartitioning(&pops,population_size,comm_bandwidth_matrix_file,false);
+				partition = new PRAWFilePartitioning(&pops,population_size,comm_bandwidth_matrix_file,false,true);
 			} else if(strcmp(part_method,"prawP") == 0) {  
 				PRINTF("%i: Partitioning: parallel PRAW\n",process_id);
-				partition = new PRAWFilePartitioning(&pops,population_size,comm_bandwidth_matrix_file,true);
+				partition = new PRAWFilePartitioning(&pops,population_size,comm_bandwidth_matrix_file,true,false);
 			} else if(strcmp(part_method,"zoltanFile") == 0) {  
 				PRINTF("%i: Partitioning: Zoltan from file\n",process_id);
 				partition = new ZoltanFilePartitioning(&pops,population_size);
