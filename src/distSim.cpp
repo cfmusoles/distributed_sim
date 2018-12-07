@@ -1795,8 +1795,8 @@ int main(int argc, char** argv) {
 			}
 			//simulate
 			PRINTF("%i: Preparing start simulation...\n",process_id);
-			int numSpikes = 0;
-			int remote_spikes = 0;
+			long int numSpikes = 0;
+			long int remote_spikes = 0;
 			int simSize = (int)(t_end / dt);
 
 			
@@ -2084,10 +2084,10 @@ int main(int argc, char** argv) {
 			// gather info from processes (spikes and timings)
 			PRINTF("End simulation. Start gathering results...\n");
 
-			int total_spikes;
-			MPI_Allreduce(&numSpikes, &total_spikes, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
-			int total_remote_spikes;
-			MPI_Allreduce(&remote_spikes, &total_remote_spikes, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+			long int total_spikes;
+			MPI_Allreduce(&numSpikes, &total_spikes, 1, MPI_LONG, MPI_SUM, MPI_COMM_WORLD);
+			long int total_remote_spikes;
+			MPI_Allreduce(&remote_spikes, &total_remote_spikes, 1, MPI_LONG, MPI_SUM, MPI_COMM_WORLD);
 			
 			double comptime = 0;
 			double proptime = 0;
@@ -2412,8 +2412,8 @@ int main(int argc, char** argv) {
 				
 		#endif		
 
-				float spikeRate = (1000.0f * total_spikes) / t_end;
-				printf("Spikes: %i, (%li neurons), \nAverage firing rate per neuron: %f Hz\n",total_spikes,model.population_size,spikeRate/model.population_size);
+				double spikeRate = (1000.0f * total_spikes) / t_end;
+				printf("Spikes: %li, (%li neurons), \nAverage firing rate per neuron: %f Hz\n",total_spikes,model.population_size,spikeRate/model.population_size);
 				printf("Init time: %fs; Gather info time: %fs\n",init_time,gather_time);
 				printf("Computation times:\n");
 				double total_comp = 0;
@@ -2494,7 +2494,7 @@ int main(int argc, char** argv) {
 					*/
 					if(!fileexists) // file does not exist, add header
 						fprintf(fp,"%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n","Build time","Sim time (per process)","Comp time (per process)","Comp deviation","Sync deviation","Idle deviation","Sync time (per process)","Idle time (per process)","Bytes sent (minimum),Messages sent","Random seed","Edgecut","Total connections","Edgecut ratio","Total computation imbalance","Neuronal computation imbalance","Synaptic computation imbalance","Spikes sent","Total spikes","Remote spikes","Total comm cost","Comm cost ratio","Avg sync group size","Average runtime neighbours","Average non-empty runtime neighbours");
-					fprintf(fp,"%f,%f,%f,%f,%f,%f,%f,%f,%lu,%lu,%i,%i,%i,%f,%f,%f,%f,%lu,%i,%i,%f,%f,%f,%f,%f\n",init_time,max_sim_time,avg_comp,comp_variance,sync_variance,idle_variance,total_sync_time/num_processes,total_idle_time/num_processes,total_sent,messages_sent,random_seed,total_cut,model.total_connections,(float)total_cut/model.total_connections,total_comp_imbalance,neuron_comp_imbalance,synapse_comp_imbalance,total_interprocess_spikes,total_spikes,total_remote_spikes,tcm,tcm / (num_processes-1),avg_sync_group_size,average_runtime_neighbours,average_non_empty_runtime_neighbours);
+					fprintf(fp,"%f,%f,%f,%f,%f,%f,%f,%f,%lu,%lu,%i,%i,%i,%f,%f,%f,%f,%lu,%li,%li,%f,%f,%f,%f,%f\n",init_time,max_sim_time,avg_comp,comp_variance,sync_variance,idle_variance,total_sync_time/num_processes,total_idle_time/num_processes,total_sent,messages_sent,random_seed,total_cut,model.total_connections,(float)total_cut/model.total_connections,total_comp_imbalance,neuron_comp_imbalance,synapse_comp_imbalance,total_interprocess_spikes,total_spikes,total_remote_spikes,tcm,tcm / (num_processes-1),avg_sync_group_size,average_runtime_neighbours,average_non_empty_runtime_neighbours);
 
 				}
 				fclose(fp);

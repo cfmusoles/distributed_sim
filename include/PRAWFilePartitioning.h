@@ -24,7 +24,7 @@ public:
 	
 	virtual void perform_partitioning(Model* model, int partitions, int process_id, std::vector<int>* previous_activity) {
 		int max_iterations = 100;
-        float imbalance_tolerance = 1.1f;
+        float imbalance_tolerance = 1.05f;
         
         if(partitions <= 1) {
 			PRINTF("Partitioning not required\n");
