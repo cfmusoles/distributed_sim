@@ -15,8 +15,9 @@
 class ZoltanFilePartitioning : public Partitioning {
 public:
 	
-	ZoltanFilePartitioning(std::vector<Population*>* pops, int population_size) : Partitioning(pops,population_size) {
-		float ver;
+	ZoltanFilePartitioning(std::vector<Population*>* pops, int population_size,char* comm_bandwidth_file) : Partitioning(pops,population_size) {
+		comm_bandwidth_filename = comm_bandwidth_file;
+        float ver;
 		rc = Zoltan_Initialize(0, NULL, &ver);
 	
 		if (rc != ZOLTAN_OK){
@@ -168,8 +169,21 @@ public:
 		if(process_id == 0) {
             std::string filename = model->hypergraph_file;
 			filename += "_zoltanFile";
-            PRAW::storePartitionStats(filename,partitioning,partitions,model->population_size,&hyperedges,&hedge_ptr,NULL,NULL);
-        }
+			// p2p communication cost estimates from file
+			double** comm_cost_matrix = (double**)malloc(sizeof(double*) * partitions);
+			for(int ii=0; ii < partitions; ii++) {
+				comm_cost_matrix[ii] = (double*)calloc(partitions,sizeof(double));
+			}
+			if(comm_bandwidth_filename != NULL) {
+				PRAW::get_comm_cost_matrix_from_bandwidth(comm_bandwidth_filename,comm_cost_matrix,partitions);
+			}
+			PRAW::storePartitionStats(filename,partitioning,partitions,model->population_size,&hyperedges,&hedge_ptr,NULL,comm_cost_matrix);
+			
+			for(int ii=0; ii < partitions; ii++) {
+				free(comm_cost_matrix[ii]);
+			}
+			free(comm_cost_matrix);
+		}
 		Zoltan_LB_Free_Part(&importGlobalGids, &importLocalGids, 
 						&importProcs, &importToPart);
 		Zoltan_LB_Free_Part(&exportGlobalGids, &exportLocalGids, 
@@ -188,6 +202,7 @@ private:
 	struct Zoltan_Struct *zz;	
 	HGRAPH_DATA hg;
 	int rc;
+	char* comm_bandwidth_filename = NULL;
 
 	void setZoltanParams() {
 		/* General parameters */

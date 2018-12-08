@@ -1531,7 +1531,7 @@ int main(int argc, char** argv) {
 				partition = new PRAWFilePartitioning(&pops,population_size,comm_bandwidth_matrix_file,true,false);
 			} else if(strcmp(part_method,"zoltanFile") == 0) {  
 				PRINTF("%i: Partitioning: Zoltan from file\n",process_id);
-				partition = new ZoltanFilePartitioning(&pops,population_size);
+				partition = new ZoltanFilePartitioning(&pops,population_size,comm_bandwidth_matrix_file);
 			} else if(strcmp(part_method,"roundrobin") == 0) {  
 				PRINTF("%i: Partitioning: Round robin\n",process_id);
 				partition = new RoundRobinPartitioning(&pops,population_size);
