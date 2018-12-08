@@ -8,14 +8,14 @@ from mpl_toolkits.mplot3d import Axes3D
 from matplotlib.ticker import LinearLocator, FormatStrFormatter
 from pylab import *
 
-num_processes = 16
-plot_bandwidth = False			# plot network bandwidth data
+num_processes = 192
+plot_bandwidth = True			# plot network bandwidth data
 plot_sent_data = False			# plot application sent data
-plot_comm_cost = True			# plot combined comm cost
+plot_comm_cost = False			# plot combined comm cost
 storeResults = False
 
 folder = "../../hyperPraw/"
-bandwidth_send_experiment_name = 'network_profile_mpi_send_bandwidth_' + str(num_processes)
+bandwidth_send_experiment_name = 'results_mpi_send_bandwidth_' + str(num_processes)
 sim_sent_experiment = 'without_prediction_comm_matrix_' + str(num_processes)
 
 xlabel = "Process"

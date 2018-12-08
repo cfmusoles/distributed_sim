@@ -77,12 +77,13 @@ public:
 				for(int jj=0; jj < hedge_ptr[from].size(); jj++) {
 					int he_id = hedge_ptr[from][jj];
 					for(int pp=0; pp < hyperedges[he_id].size(); pp++) {
+						int to = hyperedges[he_id][pp];
+                        if(to == from) continue; //
 						hg.npins++;
 						// Take into consideration synaptic computational load to weight vertices load 
 						// issue with hmetis hypergraph --> a connection between two neurons may exist more than once in the model->intereconnections array
 						// incoming synaptic computational balance must only count each once
-						int to = hyperedges[he_id][pp];
-                        total_vtx_wgts_v[to] += hyperedges[he_id].size()-1;
+						total_vtx_wgts_v[to] += hyperedges[he_id].size()-1;
 					}
 					
 				}
@@ -97,6 +98,7 @@ public:
 				for(int jj=0; jj < hedge_ptr[from].size(); jj++) {
 					int he_id = hedge_ptr[from][jj];
 					for(int pp=0; pp < hyperedges[he_id].size(); pp++) {
+						if(from == hyperedges[he_id][pp]) continue; //
 						hg.pin_GID[counter] = hyperedges[he_id][pp];
 						counter++;
 					}

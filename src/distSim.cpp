@@ -210,8 +210,7 @@ void load_model_from_hmetis_file(char* filename, NeuronParams* c_params, std::ve
 		// in each hyperedge, all to all connectivity
 		for(int ii=0; ii < tokens.size(); ii++) {
             int vertex_id = tokens[ii]-1;
-			for(int jj=ii; jj < tokens.size(); jj++) {
-				if(ii==jj) continue;
+			for(int jj=ii+1; jj < tokens.size(); jj++) {
 				//if(std::find((*conns)[0]->connections[vertex_id].begin(), 
 				//		(*conns)[0]->connections[vertex_id].end(),
 				//		 tokens[jj]-1) == (*conns)[0]->connections[vertex_id].end()) {

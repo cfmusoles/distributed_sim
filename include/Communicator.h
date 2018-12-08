@@ -36,6 +36,7 @@ public:
 		non_empty_comm_step = 0;
 		neuron_connection_to.resize(population_size);
 		messages_sent.resize(np);
+		
 	}
 	virtual ~Communicator() { }
 
@@ -52,7 +53,7 @@ public:
 		}
 	}
 	// final setup operations before start simulation
-	virtual void final_setup() { }
+	virtual void final_setup() {}
 	// perform send - receive across MPI processes
 	//virtual void send_receive(std::vector<unsigned int>* propagate, idx_t* partitioning, std::vector<std::vector<int> >* connections, std::vector<unsigned int>* received_propagate) {}
 	virtual void send_receive(std::vector<unsigned int>* propagate, std::vector<unsigned int>* received_propagate) {}
@@ -65,7 +66,7 @@ protected:
 	int process_id;
 	int num_processes;
 	int master_node;
-
+	
 	// for statistics
 	// Only for data transfers to destination processes (spikes, not comm overhead)
 	void stat_send_message_to(int size, int destination) {
