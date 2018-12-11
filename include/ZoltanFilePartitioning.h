@@ -225,7 +225,7 @@ private:
 		Zoltan_Set_Param(zz, "CHECK_HYPERGRAPH", "0");
 		Zoltan_Set_Param(zz, "PHG_EDGE_WEIGHT_OPERATION", "MAX");
 		Zoltan_Set_Param(zz, "PHG_EDGE_SIZE_THRESHOLD", "1.0");
-		Zoltan_Set_Param(zz, "PHG_CUT_OBJECTIVE", "CONNECTIVITY"); // CONNECTIVITY, HYPEREDGES
+		Zoltan_Set_Param(zz, "PHG_CUT_OBJECTIVE", "HYPEREDGES"); // CONNECTIVITY, HYPEREDGES
 		Zoltan_Set_Param(zz, "PHG_COARSENING_METHOD", "AGG");
 		Zoltan_Set_Param(zz, "PHG_COARSEPARTITION_METHOD", "AUTO");
 		Zoltan_Set_Param(zz, "PHG_REFINEMENT_METHOD", "FM");
