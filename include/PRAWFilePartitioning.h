@@ -86,7 +86,8 @@ public:
         std::string filename = model->hypergraph_file;
         if(isParallel) {
             filename += "_prawParallel";
-            PRAW::ParallelStreamingPartitioning(partitioning,comm_cost_matrix, model->population_size,&hyperedges,&hedge_ptr,vtx_wgt,max_iterations, imbalance_tolerance);
+            PRAW::ParallelIndependentRestreamingPartitioning(partitioning,comm_cost_matrix, model->hypergraph_file,vtx_wgt,max_iterations, imbalance_tolerance);
+            //PRAW::ParallelStreamingPartitioning(partitioning,comm_cost_matrix, model->population_size,&hyperedges,&hedge_ptr,vtx_wgt,max_iterations, imbalance_tolerance);
         } else {
             filename += "_prawSequential";
             PRAW::SequentialStreamingPartitioning(partitioning,comm_cost_matrix, model->population_size,&hyperedges,&hedge_ptr,vtx_wgt,max_iterations, imbalance_tolerance);
