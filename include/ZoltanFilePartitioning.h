@@ -217,7 +217,7 @@ private:
 		Zoltan_Set_Param(zz, "RETURN_LISTS", "ALL"); /* export AND import lists */
 		Zoltan_Set_Param(zz, "OBJ_WEIGHT_DIM", "1"); /* use Zoltan default vertex weights */
 		Zoltan_Set_Param(zz, "EDGE_WEIGHT_DIM", "0");/* use Zoltan default hyperedge weights */
-		Zoltan_Set_Param(zz, "IMBALANCE_TOL", "1.05");/* imbalance tolerance */
+		Zoltan_Set_Param(zz, "IMBALANCE_TOL", "1.1");/* imbalance tolerance */
 
 		// parameters for PHG: http://www.cs.sandia.gov/zoltan/ug_html/ug_alg_phg.html
 		
