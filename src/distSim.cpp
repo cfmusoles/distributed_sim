@@ -1527,7 +1527,7 @@ int main(int argc, char** argv) {
 				partition = new PRAWFilePartitioning(&pops,population_size,comm_bandwidth_matrix_file,false,true);
 			} else if(strcmp(part_method,"prawP") == 0) {  
 				PRINTF("%i: Partitioning: parallel PRAW\n",process_id);
-				partition = new PRAWFilePartitioning(&pops,population_size,comm_bandwidth_matrix_file,true,false);
+				partition = new PRAWFilePartitioning(&pops,population_size,comm_bandwidth_matrix_file,true,true);
 			} else if(strcmp(part_method,"zoltanFile") == 0) {  
 				PRINTF("%i: Partitioning: Zoltan from file\n",process_id);
 				partition = new ZoltanFilePartitioning(&pops,population_size,comm_bandwidth_matrix_file);
