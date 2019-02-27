@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 
 geometric_scaling = True
-min_num_processes = 192
+min_num_processes = 96
 # for linear scaling of processors
 max_num_processes = 288
 process_step = 32
@@ -15,13 +15,14 @@ num_experiments = 6
 geometric_step = 2
 
 show_error = True
-as_bar_plot = True
+as_bar_plot = False
+show_plot_title = False
 
-folder = "../results/archer/mvc160/"
+folder = "../results/archer/sparse_comm_st/"
 # each element on the following arrays corresponds to an experiment run (collection of files)
-experiments = ["mvc160_roundrobin_pex","mvc160_hypergraphPartitioning_nbx"]#,"sparse_comm_st_hypergraphPartitioning_pex_pruned","sparse_comm_st_hypergraphPartitioning_nbx_pruned"] # plot more than one set of results in the graphs
+experiments = ["sparse_comm_st_randomBalanced_pex_pruned","sparse_comm_st_randomBalanced_nbx_pruned","sparse_comm_st_hypergraphPartitioning_pex_pruned","sparse_comm_st_hypergraphPartitioning_nbx_pruned"] # plot more than one set of results in the graphs
 colours = ["red","green","blue","orange"] # as many as the number of experiments included
-legend_labels = ['Round Robin-PEX','HP-NBX','Hypergraph partition-PEX','Hypergraph partition-NBX']
+legend_labels = ['Random-PEX','Random-NBX','Hypergraph partition-PEX','Hypergraph partition-NBX']
 
 # Each element on the following arrays corresponds to a column in columns_to_plot
 columns_to_plot = [1,2,3,6,7,8,23]
@@ -41,10 +42,10 @@ plt.rcParams['figure.facecolor'] = 'white'
 fig_settings = {  
         'lines.linewidth': 0.5,
         'axes.linewidth': 0.5,
-        'axes.labelsize': 'small',
+        'axes.labelsize': 'medium',
         'legend.fontsize': 'small',
-        'font.size': 14,
-        'savefig.dpi': 200,
+        'font.size': 16,
+        'savefig.dpi': 1000,
 }
 plt.rcParams.update(fig_settings)
 
@@ -77,11 +78,12 @@ def plot(x,y, error,title,xlabel,ylabel,name,colour,legend,show,global_counter):
 		plt.xscale("linear")
 	plt.xlabel(xlabel)
 	plt.ylabel(ylabel)
-	plt.title(title)
+	if show_plot_title:
+		plt.title(title)
 	plt.tick_params(axis='x',which='minor',bottom=False,labelbottom=False)
 	plt.xticks(experiment_range,experiment_range)
 	#plt.tight_layout()
-	plt.gcf().subplots_adjust(left=0.17)
+	plt.gcf().subplots_adjust(left=0.18)
 	if len(experiments) > 1:
 		plt.legend(loc='best')
 	if show:

@@ -5,15 +5,16 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 
 geometric_scaling = True
-min_num_processes = 48
+min_num_processes = 96
 # for linear scaling of processors
 max_num_processes = 288
 process_step = 32
 #for geometric scaling of processors
-num_experiments = 7
+num_experiments = 6
 geometric_step = 2
 
 # simulation parameters
+show_plot_title = False
 time_steps=7500 
 total_neurons = 77000
 average_neuron_connectivity = 3000
@@ -26,7 +27,7 @@ plot_line_styles=['-','--','--','--','--']
 # Each element on the following arrays corresponds to a column in columns_to_plot
 plot_title = "Data exchange size per phase"
 plot_xlabel = "Number of processes"
-plot_ylabel = "Data sent"
+plot_ylabel = "Data sent (bytes)"
 plot_name = "a1"
 
 # general plot settings
@@ -35,12 +36,18 @@ plt.rcParams['figure.facecolor'] = 'white'
 fig_settings = {  
         'lines.linewidth': 0.5,
         'axes.linewidth': 0.5,
-        'axes.labelsize': 'small',
+        'axes.labelsize': 'large',
         'legend.fontsize': 'small',
-        'font.size': 14,
-        'savefig.dpi': 200,
+        'font.size': 11,
+        'savefig.dpi': 1000,
 }
 plt.rcParams.update(fig_settings)
+
+if geometric_scaling:
+	experiment_range = [min_num_processes * geometric_step ** (n-1) for n in range (1, num_experiments+1)]
+else:
+	experiment_range = range(min_num_processes, max_num_processes+1,process_step)
+	
 
 def get_data_from_csv(filename):
 	data = np.genfromtxt(filename,skip_header=1,delimiter=",")
@@ -56,7 +63,11 @@ def plot(x,y,linestyle,title,xlabel,ylabel,name,colour,legend,show):
 		plt.xscale("linear")
 	plt.xlabel(xlabel)
 	plt.ylabel(ylabel)
-	plt.title(title)
+	if show_plot_title:
+		plt.title(title)
+	plt.tick_params(axis='x',which='minor',bottom=False,labelbottom=False)
+	plt.xticks(experiment_range,experiment_range,rotation='vertical')
+	plt.gcf().subplots_adjust(bottom=0.18)
 	plt.legend(loc=2)
 	if show:
 		plt.savefig(name + "." + image_format,format=image_format,dpi=1000)

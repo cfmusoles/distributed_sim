@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 
 geometric_scaling = True
-min_num_processes = 192
+min_num_processes = 96
 # for linear scaling of processors
 max_num_processes = 32
 process_step = 3
@@ -13,13 +13,14 @@ process_step = 3
 num_experiments = 6
 geometric_step = 2
 
-folder = "../results/archer/mvc160/"
-experiment = "mvc160_hypergraphPartitioning_nbx" #"mvc160_hypergraphPartitioning_nbx"
+folder = "../results/archer/baseline_strong/"
+experiment = "baseline_strong_random_pex" #"mvc160_hypergraphPartitioning_nbx"
 
 # Each element on the following arrays corresponds to a column in columns_to_plot
 columns_to_plot = [1,2,6,7] #reference column is the first one
 useReferenceValue = False
 expressAsPercentage = True
+show_plot_title = False
 colours = 'rbc'#'byrwgcm' 
 legend_labels = ['Computation','Data Exchange','Implicit sync']
 
@@ -34,10 +35,10 @@ plt.rcParams['figure.facecolor'] = 'white'
 fig_settings = {  
         'lines.linewidth': 0.5,
         'axes.linewidth': 0.5,
-        'axes.labelsize': 'small',
-        'legend.fontsize': 'small',
-        'font.size': 14,
-        'savefig.dpi': 200,
+        'axes.labelsize': 'large',
+        'legend.fontsize': 'medium',
+        'font.size': 16,
+        'savefig.dpi': 1000,
 }
 plt.rcParams.update(fig_settings)
 
@@ -64,7 +65,8 @@ def plot(x,y):
 	ax.set_xticklabels(x)
 	plt.xlabel(plot_xlabel)
 	plt.ylabel(plot_ylabel)
-	plt.title(plot_title)
+	if show_plot_title:
+		plt.title(plot_title)
 	#plt.legend(loc=3)
 	plt.legend(bbox_to_anchor=(1.0,1.15))
 	plt.savefig(plot_name + "." + image_format,format=image_format,dpi=1000)
