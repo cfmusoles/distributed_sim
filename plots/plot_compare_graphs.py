@@ -15,6 +15,8 @@ num_experiments = 6
 geometric_step = 2
 colour = "green"
 
+show_title = False
+
 folder = "../results/archer/mvc160/"
 # each element on the following arrays corresponds to an experiment run (collection of files)
 # only 2 are acceptable
@@ -22,13 +24,13 @@ experiments = ["mvc160_roundrobin_pex","mvc160_hypergraphPartitioning_nbx"] # pl
 legend_label = ""#HP gain over Random"
 
 # Each element on the following arrays corresponds to a column in columns_to_plot
-columns_to_plot = [17,8,23,0,1] # 8, 3, 22
-scale_plots = [0,0,0,1,1] # if 0, show difference in percentage
+columns_to_plot = [16,8,22,0,1] # 8, 3, 22
+scale_plots = [0,0,0,1,0] # if 0, show difference in percentage
 reference_values = [17,8,23,0,0] # used to take values on each column divided by these
-use_ref_values = False
+use_ref_values = True
 plot_title = ["Remote spikes (HB-NBX over round robin)","Data volume (HP-NBX over Round robin)","ARN reduction (Round Robin vs hypergraph)","Build time cost (HB-NBX over round robin)","Simulation time gain (HB-NBX over round robin)"]
 plot_xlabel = ["Number of processes","Number of processes","Number of processes","Number of processes","Number of processes"]
-plot_ylabel = ["Spikes sent difference (%)","Data exchanged difference (%)","ARN difference (%)","Time loss (s)","Time gain (% of build cost)"]
+plot_ylabel = ["Spikes sent difference (%)","Data exchanged difference (%)","ARN difference (%)","Time loss (s)","Time gain (s)"]
 image_format = 'pdf'
 plot_name = ['a' + str(x) for x in range(len(columns_to_plot))] #["a1","a2","a3","a4","a5","a6","a7"]
 
@@ -64,8 +66,10 @@ def plot(x,y, error,title,xlabel,ylabel,name,colour,legend):
 	plt.ylabel(ylabel)
 	plt.xticks([e*1.25 for e in experiment_range],experiment_range)
 	plt.tick_params(axis='x',which='minor',bottom=False,labelbottom=False)
-	plt.title(title)
+	if show_title:
+		plt.title(title)
 	#plt.ylim(0,100)
+	plt.gcf().subplots_adjust(left=0.18,bottom=0.2)
 	if not legend == "":
 		plt.legend(loc=1)
 	plt.savefig(name + "." + image_format,format=image_format,dpi=1000)

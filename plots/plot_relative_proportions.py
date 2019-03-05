@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 
 geometric_scaling = True
-min_num_processes = 96
+min_num_processes = 192
 # for linear scaling of processors
 max_num_processes = 32
 process_step = 3
@@ -13,8 +13,8 @@ process_step = 3
 num_experiments = 6
 geometric_step = 2
 
-folder = "../results/archer/baseline_strong/"
-experiment = "baseline_strong_random_pex" #"mvc160_hypergraphPartitioning_nbx"
+folder = "../results/archer/mvc160/"
+experiment = "mvc160_hypergraphPartitioning_nbx" #"mvc160_hypergraphPartitioning_nbx"
 
 # Each element on the following arrays corresponds to a column in columns_to_plot
 columns_to_plot = [1,2,6,7] #reference column is the first one

@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 
 geometric_scaling = True
-min_num_processes = 96
+min_num_processes = 192
 # for linear scaling of processors
 max_num_processes = 288
 process_step = 32
@@ -18,16 +18,17 @@ show_error = True
 as_bar_plot = False
 show_plot_title = False
 
-folder = "../results/archer/sparse_comm_st/"
+folder = "../results/archer/mvc160/"
 # each element on the following arrays corresponds to an experiment run (collection of files)
-experiments = ["sparse_comm_st_randomBalanced_pex_pruned","sparse_comm_st_randomBalanced_nbx_pruned","sparse_comm_st_hypergraphPartitioning_pex_pruned","sparse_comm_st_hypergraphPartitioning_nbx_pruned"] # plot more than one set of results in the graphs
+experiments = ["mvc160_roundrobin_pex","mvc160_hypergraphPartitioning_nbx"]#,"sparse_comm_st_hypergraphPartitioning_pex_pruned","sparse_comm_st_hypergraphPartitioning_nbx_pruned"] # plot more than one set of results in the graphs
 colours = ["red","green","blue","orange"] # as many as the number of experiments included
-legend_labels = ['Random-PEX','Random-NBX','Hypergraph partition-PEX','Hypergraph partition-NBX']
+legend_labels = ['Round robin-PEX','Hypergraph partition-NBX','Hypergraph partition-PEX','Hypergraph partition-NBX']
 
 # Each element on the following arrays corresponds to a column in columns_to_plot
 columns_to_plot = [1,2,3,6,7,8,23]
 reference_values = [0,2,1,6,7,8,23] # used to take values on each column divided by these
 use_ref_values = False
+plot_perfect_scaling = [True,False,False,False,False,False,False]
 scale_plots = [1,1,1,1,1,1e-9,1]
 plot_title = ["Simulation time","Computation time","Computation variance","Data Exchange time","Implicit sync time","Data volume","Average Runtime Neighbours"]
 plot_xlabel = ["Number of processes","Number of processes","Number of processes","Number of processes","Number of processes","Number of processes","Number of processes"]
@@ -83,7 +84,7 @@ def plot(x,y, error,title,xlabel,ylabel,name,colour,legend,show,global_counter):
 	plt.tick_params(axis='x',which='minor',bottom=False,labelbottom=False)
 	plt.xticks(experiment_range,experiment_range)
 	#plt.tight_layout()
-	plt.gcf().subplots_adjust(left=0.18)
+	plt.gcf().subplots_adjust(left=0.18,bottom=0.2)
 	if len(experiments) > 1:
 		plt.legend(loc='best')
 	if show:

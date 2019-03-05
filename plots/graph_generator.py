@@ -3,10 +3,15 @@ import matplotlib.pyplot as plt
 import numpy as np
 import itertools
 
+image_format = "pdf"
+vertex_colour = "red"
+
 def draw_and_plot(G,node_colour="blue",edge_colour="black",with_labels=False,node_size=300):
     #https://networkx.github.io/documentation/networkx-1.9/reference/generated/networkx.drawing.nx_pylab.draw_networkx.html
     nx.draw_networkx(G,node_color=node_colour,edge_color=edge_colour,with_labels=with_labels,node_size=node_size)
+    plt.axis("off")
     plt.draw()
+    plt.savefig("a" + image_format,format=image_format,dpi=1000)
     plt.show()
 
 # randomly partitioned graph 
@@ -18,9 +23,8 @@ G = nx.random_partition_graph(nodes,0.2,1.00,directed=False)
 
 
 # G = nx.powerlaw_cluster_graph(200,5,0.0)
-G = nx.relaxed_caveman_graph(8, 16, 0.05)
-
-#draw_and_plot(G)
+#G = nx.relaxed_caveman_graph(8, 16,0.05)
+draw_and_plot(G,node_colour=vertex_colour)
 
 # custom graph (hyperedges)
 #G = nx.DiGraph()
@@ -58,20 +62,20 @@ G = nx.relaxed_caveman_graph(8, 16, 0.05)
 #plt.show()
 
 # custom graph (synfire)
-G = nx.Graph()
-nodes1 = [x for x in range(0,10)]
-nodes2 = [x for x in range(10,20)]
-nodes3 = [x for x in range(20,30)]
-nodes4 = [x for x in range(30,40)]
-G.add_nodes_from(nodes1)
-G.add_nodes_from(nodes2)
-G.add_nodes_from(nodes3)
-G.add_nodes_from(nodes4)
-edges1 = list(itertools.product(nodes1, nodes2))
-edges2 = list(itertools.product(nodes2, nodes3))
-edges3 = list(itertools.product(nodes3, nodes4))
-G.add_edges_from(edges1,color='black')
-G.add_edges_from(edges2,color='black')
-G.add_edges_from(edges3,color='black')
-edge_colours = [G[u][v]['color'] for u,v in G.edges()]
-draw_and_plot(G,with_labels=False,node_colour='blue',edge_colour=edge_colours,node_size=700)
+#G = nx.Graph()
+#nodes1 = [x for x in range(0,10)]
+#nodes2 = [x for x in range(10,20)]
+#nodes3 = [x for x in range(20,30)]
+#nodes4 = [x for x in range(30,40)]
+#G.add_nodes_from(nodes1)
+#G.add_nodes_from(nodes2)
+#G.add_nodes_from(nodes3)
+#G.add_nodes_from(nodes4)
+#edges1 = list(itertools.product(nodes1, nodes2))
+#edges2 = list(itertools.product(nodes2, nodes3))
+#edges3 = list(itertools.product(nodes3, nodes4))
+#G.add_edges_from(edges1,color='black')
+#G.add_edges_from(edges2,color='black')
+#G.add_edges_from(edges3,color='black')
+#edge_colours = [G[u][v]['color'] for u,v in G.edges()]
+#draw_and_plot(G,with_labels=False,node_colour='blue',edge_colour=edge_colours,node_size=700)
