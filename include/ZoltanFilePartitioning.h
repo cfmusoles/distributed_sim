@@ -177,7 +177,7 @@ public:
 				comm_cost_matrix[ii] = (double*)calloc(partitions,sizeof(double));
 			}
 			if(comm_bandwidth_filename != NULL) {
-				PRAW::get_comm_cost_matrix_from_bandwidth(comm_bandwidth_filename,comm_cost_matrix,partitions);
+				PRAW::get_comm_cost_matrix_from_bandwidth(comm_bandwidth_filename,comm_cost_matrix,partitions,false);
 			}
 			PRAW::storePartitionStats(filename,partitioning,partitions,model->population_size,&hyperedges,&hedge_ptr,NULL,comm_cost_matrix);
 			

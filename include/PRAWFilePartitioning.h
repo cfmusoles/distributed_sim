@@ -43,7 +43,7 @@ public:
         // 2 - Pass data to PRAW to partition
         // 3 - return partitioning
         
-        if(model->hypergraph_file == NULL) {
+        /*if(model->hypergraph_file == NULL) {
             PRINTF("%i: hypergraph file not set in Model object. Random partition.",process_id);
             return;
         }
@@ -51,14 +51,16 @@ public:
         std::vector<std::vector<int> > hyperedges(model->population_size);
         std::vector<std::vector<int> > hedge_ptr(model->population_size);
         
-        PRAW::load_hypergraph_from_file(model->hypergraph_file,&hyperedges,&hedge_ptr);
+        PRAW::load_hypergraph_from_file(model->hypergraph_file,&hyperedges,&hedge_ptr);*/
         
+
         // initialise vertex weight values --> if model->null_compute then uniform; else number of incomming connections
         int* vtx_wgt = (int*)calloc(model->population_size,sizeof(int));
         for(int ii =0; ii < model->population_size; ii++) {
             vtx_wgt[ii] = 1;
         }
-        if(!model->null_compute) {
+
+        /*if(!model->null_compute) {
             // weight of computation associated to incoming synapses
             // assume all to all connectivity within a hyperedge (needs to match how model->interconnectivity is constructed)
             for(int ii=0; ii < model->population_size; ii++) {
@@ -70,7 +72,7 @@ public:
                     }
                 }
             }
-        }
+        }*/
 
         // p2p communication cost estimates from file
         double** comm_cost_matrix = (double**)malloc(sizeof(double*) * partitions);
@@ -79,25 +81,33 @@ public:
         }
 
         if(use_bandwidth_file)
-            PRAW::get_comm_cost_matrix_from_bandwidth(comm_bandwidth_filename,comm_cost_matrix,partitions);
+            PRAW::get_comm_cost_matrix_from_bandwidth(comm_bandwidth_filename,comm_cost_matrix,partitions,false);
         else
-            PRAW::get_comm_cost_matrix_from_bandwidth(NULL,comm_cost_matrix,partitions);
+            PRAW::get_comm_cost_matrix_from_bandwidth(NULL,comm_cost_matrix,partitions,false);
         
         std::string filename = model->hypergraph_file;
         if(isParallel) {
             filename += "_prawParallel";
-            PRAW::ParallelIndependentRestreamingPartitioning(partitioning,comm_cost_matrix, model->hypergraph_file,vtx_wgt,max_iterations, imbalance_tolerance);
-            //PRAW::ParallelStreamingPartitioning(partitioning,comm_cost_matrix, model->population_size,&hyperedges,&hedge_ptr,vtx_wgt,max_iterations, imbalance_tolerance);
+            // define parameters
+            float ta_refine = 0.95f;
+            int stopping_condition = 2;
+            char* experiment_name;
+            PRAW::ParallelIndependentRestreamingPartitioning(experiment_name,partitioning,comm_cost_matrix, model->hypergraph_file,vtx_wgt,max_iterations, imbalance_tolerance,ta_refine,true,stopping_condition,false);
         } else {
             filename += "_prawSequential";
-            PRAW::SequentialStreamingPartitioning(partitioning,comm_cost_matrix, model->population_size,&hyperedges,&hedge_ptr,vtx_wgt,max_iterations, imbalance_tolerance);
+            // define parameters
+            float ta_refine = 0.95f;
+            int stopping_condition = 2;
+            char* experiment_name;
+            PRAW::SequentialStreamingPartitioning(experiment_name,partitioning,partitions,comm_cost_matrix, model->hypergraph_file,vtx_wgt,max_iterations, imbalance_tolerance,ta_refine,true,stopping_condition, false);
         }
 
         if(process_id == 0) {
             if(!use_bandwidth_file && comm_bandwidth_filename != NULL)
-                PRAW::get_comm_cost_matrix_from_bandwidth(comm_bandwidth_filename,comm_cost_matrix,partitions);
+                PRAW::get_comm_cost_matrix_from_bandwidth(comm_bandwidth_filename,comm_cost_matrix,partitions,false);
                 
-            PRAW::storePartitionStats(filename,partitioning,partitions,model->population_size,&hyperedges,&hedge_ptr,vtx_wgt,comm_cost_matrix);
+            //PRAW::storePartitionStats(filename,partitioning,partitions,model->population_size,&hyperedges,&hedge_ptr,vtx_wgt,comm_cost_matrix);
+            // Use PRAW::getVertexCentricPartitionStatsFromFile instead and record results manually if needed
         }
 
         free(vtx_wgt);

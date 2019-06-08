@@ -6,8 +6,8 @@
 //#define MEASURE_IDLE_TIME				// Separate comm into process idle (wait for others) and sync time
 //#define ADVANCED_COMM_STATS				// store, for each communication, size of message
 #define ADVANCED_COMM_STATS_MATRIX_ONLY	// only store process-to-process total messaging (not individual message size) 
-//#define VERBOSE						// display debugging information (build time)
-#define PARTITION_CONNECTIVITY_GRAPH	// store partition connectivity graph
+#define VERBOSE						// display debugging information (build time)
+//#define PARTITION_CONNECTIVITY_GRAPH	// store partition connectivity graph
 					
 
 // TODO
@@ -60,7 +60,7 @@
 #include "RandomPartitioning.h"
 #include "RandomBalancedPartitioning.h"
 #include "CustomPartitioning.h"
-#include "PRAWFilePartitioning.h"
+#include "HyperPRAWPartitioning.h"
 #include "ZoltanFilePartitioning.h"
 #include "RoundRobinPartitioning.h"
 #include "Connectivity.h"
@@ -1518,16 +1518,16 @@ int main(int argc, char** argv) {
 				else partition = new CustomPartitioning(&pops,population_size,custom_partitioning);
 			} else if(strcmp(part_method,"prawS_without") == 0) {  
 				PRINTF("%i: Partitioning: sequential PRAW\n",process_id);
-				partition = new PRAWFilePartitioning(&pops,population_size,comm_bandwidth_matrix_file,false,false);
+				partition = new HyperPRAWPartitioning(&pops,population_size,comm_bandwidth_matrix_file,false,false);
 			} else if(strcmp(part_method,"prawP_without") == 0) {  
 				PRINTF("%i: Partitioning: parallel PRAW\n",process_id);
-				partition = new PRAWFilePartitioning(&pops,population_size,comm_bandwidth_matrix_file,true,false);
+				partition = new HyperPRAWPartitioning(&pops,population_size,comm_bandwidth_matrix_file,true,false);
 			} else if(strcmp(part_method,"prawS") == 0) {  
 				PRINTF("%i: Partitioning: sequential PRAW\n",process_id);
-				partition = new PRAWFilePartitioning(&pops,population_size,comm_bandwidth_matrix_file,false,true);
+				partition = new HyperPRAWPartitioning(&pops,population_size,comm_bandwidth_matrix_file,false,true);
 			} else if(strcmp(part_method,"prawP") == 0) {  
 				PRINTF("%i: Partitioning: parallel PRAW\n",process_id);
-				partition = new PRAWFilePartitioning(&pops,population_size,comm_bandwidth_matrix_file,true,true);
+				partition = new HyperPRAWPartitioning(&pops,population_size,comm_bandwidth_matrix_file,true,true);
 			} else if(strcmp(part_method,"zoltanFile") == 0) {  
 				PRINTF("%i: Partitioning: Zoltan from file\n",process_id);
 				partition = new ZoltanFilePartitioning(&pops,population_size,comm_bandwidth_matrix_file);
