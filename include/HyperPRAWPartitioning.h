@@ -94,6 +94,8 @@ public:
 
             // write connectivity per neuron id
             for(int ii=0; ii < model->population_size; ii++) {
+                // write presynaptic neuron as first neuron
+                fprintf(fp,"%i ",ii + 1);
                 // write all connections from ii
                 for(int jj=0; jj < model->interconnections_size[ii]; jj++) {
                     fprintf(fp,"%i ",abs(model->interconnections[ii][jj]) + 1);
