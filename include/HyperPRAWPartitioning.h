@@ -25,7 +25,7 @@ public:
 	virtual ~HyperPRAWPartitioning() {}
 	
 	virtual void perform_partitioning(Model* model, int partitions, int process_id, std::vector<int>* previous_activity) {
-		int max_iterations = 100;
+		int max_iterations = 150;
         float imbalance_tolerance = 1.1f;
         
         if(partitions <= 1) {
@@ -35,10 +35,15 @@ public:
 
         // PREP DATA STRUCTURES
         // initialise vertex weight values --> if model->null_compute then uniform; else number of incomming connections
-        // TODO: Zoltan does consider this balance, so needs to be a fair comparison
         int* vtx_wgt = (int*)calloc(model->population_size,sizeof(int));
-        for(int ii =0; ii < model->population_size; ii++) {
+        /*for(int ii =0; ii < model->population_size; ii++) {
             vtx_wgt[ii] = 1;
+        }*/
+        // Zoltan does consider this balance, so needs to be a fair comparison
+        for(int ii=0; ii < model->population_size; ii++) {
+            for(int jj=0; jj < model->interconnections_size[ii]; jj++) {
+                vtx_wgt[abs(model->interconnections[ii][jj])] += 1;
+            }
         }
         /*if(!model->null_compute) {
             // weight of computation associated to incoming synapses

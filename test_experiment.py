@@ -14,7 +14,7 @@ template_2 = '''
 template_3=''':bigmem='''
 template_4='''
 # walltime
-#PBS -l walltime=3:00:0
+#PBS -l walltime=2:00:0
 # budget code
 #PBS -A e582
 
@@ -58,7 +58,7 @@ run_experiment() {
 	SEED="$4"
 	for i in $(seq 1 $TEST_REPETITIONS)
 	do
-		aprun -n $P $APP_NAME -n $EXPERIMENT_NAME -c $COMM_PATTERN -p $DISTRIBUTION -s $SEED -k 100 -f 1000 -t 150 -m "cm" -i 24 -b $BM_FILE
+		aprun -n $P $APP_NAME -n $EXPERIMENT_NAME -c $COMM_PATTERN -p $DISTRIBUTION -s $SEED -k 500 -f 1000 -t 150 -m "cm" -i 24 -b $BM_FILE
 		sleep 1
 	done
 }
