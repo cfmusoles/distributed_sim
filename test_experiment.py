@@ -60,7 +60,7 @@ run_experiment() {
 	do
 		#aprun -n $P $APP_NAME -n $EXPERIMENT_NAME -c $COMM_PATTERN -p $DISTRIBUTION -s $SEED -k 500 -f 1000 -t 150 -m "cm" -i 24 -b $BM_FILE
 		sleep 1
-		aprun -n $P $APP_NAME -n $EXPERIMENT_NAME -c $COMM_PATTERN -p $DISTRIBUTION -s $SEED -k 100 -f 100 -t 150 -m "mvc" -i 24 -b $BM_FILE
+		aprun -n $P $APP_NAME -n $EXPERIMENT_NAME -c $COMM_PATTERN -p $DISTRIBUTION -s $SEED -k 200 -f 200 -t 150 -m "mvc" -i 24 -b $BM_FILE
 		sleep 1
 	done
 }

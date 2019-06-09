@@ -92,6 +92,14 @@ public:
             fprintf(fp,"%lu %lu",model->population_size,model->population_size);
             fprintf(fp,"\n");
 
+            std::vector<std::vector<int> > presynaptics(model->population_size);
+            // add presynaptic neuron to hyperedge lead by each post synaptic neuron. See HypergraphPartitioning
+            for(int ii=0; ii < model->population_size; ii++) {
+                for(int jj=0; jj < model->interconnections_size[ii]; jj++) {
+                    presynaptics[abs(model->interconnections[ii][jj])].push_back(ii);
+                }
+            }
+
             // write connectivity per neuron id
             for(int ii=0; ii < model->population_size; ii++) {
                 // write presynaptic neuron as first neuron
@@ -100,6 +108,10 @@ public:
                 for(int jj=0; jj < model->interconnections_size[ii]; jj++) {
                     fprintf(fp,"%i ",abs(model->interconnections[ii][jj]) + 1);
                 }
+                for(int jj=0; jj < presynaptics[ii].size(); jj++) {
+                    fprintf(fp,"%i ",presynaptics[ii][jj] + 1);
+                } 
+                
                 fprintf(fp,"\n");
             }
             fclose(fp);
