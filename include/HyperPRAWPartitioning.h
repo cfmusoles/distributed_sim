@@ -109,13 +109,13 @@ public:
                 // write presynaptic neuron as first neuron
                 fprintf(fp,"%i ",ii + 1);
                 // write all connections from ii
-                /*for(int jj=0; jj < model->interconnections_size[ii]; jj++) {
+                for(int jj=0; jj < model->interconnections_size[ii]; jj++) {
                     fprintf(fp,"%i ",abs(model->interconnections[ii][jj]) + 1);
-                }*/
+                }
                 // write all connections to ii
-                for(int jj=0; jj < presynaptics[ii].size(); jj++) {
+                /*for(int jj=0; jj < presynaptics[ii].size(); jj++) {
                     fprintf(fp,"%i ",presynaptics[ii][jj] + 1);
-                } 
+                } */
                 
                 fprintf(fp,"\n");
             }
