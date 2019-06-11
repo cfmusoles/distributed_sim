@@ -71,7 +71,11 @@ public:
             PRAW::get_comm_cost_matrix_from_bandwidth(NULL,comm_cost_matrix,partitions,false);
         
         // temporary hMETIS file
-        const char* hgraph_file = "model.hgr";
+        std::string hgraph_file = "model_";
+        char str_int[16];
+        sprintf(str_int,"%i",partitions);
+        hgraph_file += str_int;
+        hgraph_file += ".hgr";
 
         // 1 Save current model to hMETIS format file (only one process needs to do this)
         //      Header: num_hyperedges num_vertices
@@ -84,8 +88,8 @@ public:
         if(process_id == 0) {
             // generate hMETIS file
             // store model in file
-            PRINTF("%i: Storing model in file %s\n",process_id,hgraph_file);
-            FILE *fp = fopen(hgraph_file, "w+");
+            PRINTF("%i: Storing model in file %s\n",process_id,hgraph_file.c_str());
+            FILE *fp = fopen(hgraph_file.c_str(), "w+");
             
             // write header: NUM_HYPEREDGES NUM_VERTICES
             //  num hyperedges == number of vertices, since each hyperedge represents a presynaptic neuron and all its connecting post synaptic neighbours
@@ -132,12 +136,12 @@ public:
             char experiment_name[filename.length() + 1]; 
             strcpy(experiment_name, filename.c_str()); 
             printf("%i: Onto partitioning\n",process_id);
-            PRAW::ParallelIndependentRestreamingPartitioning(experiment_name,partitioning,comm_cost_matrix, hgraph_file,vtx_wgt,max_iterations, imbalance_tolerance,ta_refine,true,stopping_condition,false);
+            PRAW::ParallelIndependentRestreamingPartitioning(experiment_name,partitioning,comm_cost_matrix, hgraph_file.c_str(),vtx_wgt,max_iterations, imbalance_tolerance,ta_refine,true,stopping_condition,false);
         } else {
             filename += "_prawSequential";
             char experiment_name[filename.length() + 1]; 
             strcpy(experiment_name, filename.c_str()); 
-            PRAW::SequentialStreamingPartitioning(experiment_name,partitioning,partitions,comm_cost_matrix, hgraph_file,vtx_wgt,max_iterations, imbalance_tolerance,ta_refine,true,stopping_condition, false);
+            PRAW::SequentialStreamingPartitioning(experiment_name,partitioning,partitions,comm_cost_matrix, hgraph_file.c_str(),vtx_wgt,max_iterations, imbalance_tolerance,ta_refine,true,stopping_condition, false);
         }
 
         if(process_id == 0) {
@@ -156,8 +160,8 @@ public:
 
         if(process_id == 0) {
             // remove graph file
-            if( remove(hgraph_file) != 0 )
-                printf( "Error deleting temporary hgraph file %s\n",hgraph_file );
+            if( remove(hgraph_file.c_str()) != 0 )
+                printf( "Error deleting temporary hgraph file %s\n",hgraph_file.c_str() );
         }
 
 	}
