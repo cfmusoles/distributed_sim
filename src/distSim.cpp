@@ -6,7 +6,7 @@
 //#define MEASURE_IDLE_TIME				// Separate comm into process idle (wait for others) and sync time
 //#define ADVANCED_COMM_STATS				// store, for each communication, size of message
 #define ADVANCED_COMM_STATS_MATRIX_ONLY	// only store process-to-process total messaging (not individual message size) 
-#define VERBOSE						// display debugging information (build time)
+//#define VERBOSE						// display debugging information (build time)
 //#define PARTITION_CONNECTIVITY_GRAPH	// store partition connectivity graph
 					
 
@@ -60,7 +60,8 @@
 #include "RandomPartitioning.h"
 #include "RandomBalancedPartitioning.h"
 #include "CustomPartitioning.h"
-#include "HyperPRAWPartitioning.h"
+#include "HyperPRAWEdgePartitioning.h"
+#include "HyperPRAWVertexPartitioning.h"
 #include "ZoltanFilePartitioning.h"
 #include "RoundRobinPartitioning.h"
 #include "Connectivity.h"
@@ -503,7 +504,7 @@ int main(int argc, char** argv) {
 				conns.push_back(c);
 			}
 		}
-	} else if(strcmp(model_selected,"mvc") == 0) {
+	} else if(strcmp(model_selected,"mvc") == 0 || strcmp(model_selected,"mvc_nonrandomsyn") == 0) {
 		// USED FOR FRONTIERS IN NEUROINFORMATICS PAPER //
 		// MULTI AREA MODEL --> 32 areas, each one similar connectivity CM
 		// Schmidt 2018 https://github.com/INM-6/multi-area-model
@@ -533,9 +534,17 @@ int main(int argc, char** argv) {
 		c_params->exc_tau_s = 0.5f;			// time constant for exc synapses (ms) 
 		c_params->inh_tau_s = 0.5f;		// time constant for inh synapses (ms) 
 		c_params->exc_delay_mean = 1.5f;	// delay on exc synaptic propagation (ms)
-		c_params->exc_delay_dev = 0.7f;		// delay on exc synaptic propagation (ms) was 0.7
 		c_params->inh_delay_mean = 0.8f;	// delay on inh synaptic propagation (ms)
-		c_params->inh_delay_dev = 0.4f;		// delay on inh synaptic propagation (ms) was 0.4
+		
+		if(strcmp(model_selected,"mvc_nonrandomsyn") == 0) {
+			// non randomness in synaptic parameters
+			c_params->exc_delay_dev = 0.0f;		// delay on exc synaptic propagation (ms) was 0.7
+			c_params->inh_delay_dev = 0.0f;		// delay on inh synaptic propagation (ms) was 0.4
+		} else {
+			// randomness in synaptic parameters
+			c_params->exc_delay_dev = 0.7f;		// delay on exc synaptic propagation (ms) was 0.7
+			c_params->inh_delay_dev = 0.4f;		// delay on inh synaptic propagation (ms) was 0.4
+		}
 
 		// json examples and doc https://en.wikibooks.org/wiki/JsonCpp
 		std::ifstream ifs("multiareaModel.json");
@@ -1516,18 +1525,18 @@ int main(int argc, char** argv) {
 				PRINTF("%i: Partitioning: custom\n",process_id);
 				if(custom_partitioning == NULL) partition = new RandomPartitioning(&pops,population_size);
 				else partition = new CustomPartitioning(&pops,population_size,custom_partitioning);
-			} else if(strcmp(part_method,"prawS_without") == 0) {  
-				PRINTF("%i: Partitioning: sequential PRAW\n",process_id);
-				partition = new HyperPRAWPartitioning(&pops,population_size,comm_bandwidth_matrix_file,false,false);
-			} else if(strcmp(part_method,"prawP_without") == 0) {  
-				PRINTF("%i: Partitioning: parallel PRAW\n",process_id);
-				partition = new HyperPRAWPartitioning(&pops,population_size,comm_bandwidth_matrix_file,true,false);
-			} else if(strcmp(part_method,"prawS") == 0) {  
-				PRINTF("%i: Partitioning: sequential PRAW\n",process_id);
-				partition = new HyperPRAWPartitioning(&pops,population_size,comm_bandwidth_matrix_file,false,true);
-			} else if(strcmp(part_method,"prawP") == 0) {  
-				PRINTF("%i: Partitioning: parallel PRAW\n",process_id);
-				partition = new HyperPRAWPartitioning(&pops,population_size,comm_bandwidth_matrix_file,true,true);
+			} else if(strcmp(part_method,"prawE_without") == 0) {  
+				PRINTF("%i: Partitioning: edge partitioning PRAW\n",process_id);
+				partition = new HyperPRAWEdgePartitioning(&pops,population_size,comm_bandwidth_matrix_file,false,false);
+			} else if(strcmp(part_method,"prawV_without") == 0) {  
+				PRINTF("%i: Partitioning: vertex partitioning PRAW\n",process_id);
+				partition = new HyperPRAWVertexPartitioning(&pops,population_size,comm_bandwidth_matrix_file,false);
+			} else if(strcmp(part_method,"prawE") == 0) {  
+				PRINTF("%i: Partitioning: edge partitioning PRAW\n",process_id);
+				partition = new HyperPRAWEdgePartitioning(&pops,population_size,comm_bandwidth_matrix_file,false,true);
+			} else if(strcmp(part_method,"prawV") == 0) {  
+				PRINTF("%i: Partitioning: vertex partitioning PRAW\n",process_id);
+				partition = new HyperPRAWVertexPartitioning(&pops,population_size,comm_bandwidth_matrix_file,true);
 			} else if(strcmp(part_method,"zoltanFile") == 0) {  
 				PRINTF("%i: Partitioning: Zoltan from file\n",process_id);
 				partition = new ZoltanFilePartitioning(&pops,population_size,comm_bandwidth_matrix_file);
