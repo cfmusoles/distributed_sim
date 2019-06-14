@@ -25,7 +25,7 @@ public:
 	
 	virtual void perform_partitioning(Model* model, int partitions, int process_id, std::vector<int>* previous_activity) {
 		int max_iterations = 100;
-        float imbalance_tolerance = 1.1f;
+        float imbalance_tolerance = 1.2f;
         
         if(partitions <= 1) {
 			PRINTF("Partitioning not required\n");
@@ -37,6 +37,7 @@ public:
         int* he_wgt = (int*)calloc(model->population_size,sizeof(int));
         // Zoltan does consider this balance, so needs to be a fair comparison
         for(int ii=0; ii < model->population_size; ii++) {
+            he_wgt[ii] += 1;
             for(int jj=0; jj < model->interconnections_size[ii]; jj++) {
                 he_wgt[abs(model->interconnections[ii][jj])] += 1;
             }
