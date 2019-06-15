@@ -59,6 +59,9 @@ public:
         char str_int[16];
         sprintf(str_int,"%i",partitions);
         hgraph_file += str_int;
+        hgraph_file += "_";
+        sprintf(str_int,"%i",process_id);
+        hgraph_file += str_int;
         hgraph_file += ".hgr";
 
         // 1 Save current model to hMETIS format file (only one process needs to do this)
@@ -69,7 +72,7 @@ public:
         // 4 Clean up unused datastructures
 
         // MASTER NODE creates hMETIS file
-        if(process_id == 0) {
+        if(true || process_id == 0) {
             // generate hMETIS file
             // store model in file
             PRINTF("%i: Storing model in file %s\n",process_id,hgraph_file.c_str());
@@ -120,8 +123,12 @@ public:
             if(!use_bandwidth_file && comm_bandwidth_filename != NULL)
                 PRAW::get_comm_cost_matrix_from_bandwidth(comm_bandwidth_filename,comm_cost_matrix,partitions,false);
                 
-            //PRAW::storePartitionStats(filename,partitioning,partitions,model->population_size,&hyperedges,&hedge_ptr,he_wgt,comm_cost_matrix);
-            // Use PRAW::getVertexCentricPartitionStatsFromFile instead and record results manually if needed
+            float vertex_replication_factor;
+            float max_hedge_imbalance;
+            double total_sim_comm_cost;
+            PRAW::getEdgeCentricPartitionStatsFromFile(partitioning, partitions, hgraph_file.c_str(), he_wgt,comm_cost_matrix,
+                                        &vertex_replication_factor, &max_hedge_imbalance, &total_sim_comm_cost);
+            // store results?
         }
 
         free(he_wgt);
@@ -133,7 +140,7 @@ public:
         // wait for all before deleting the hgraph file
         MPI_Barrier(MPI_COMM_WORLD);
 
-        if(process_id == 0) {
+        if(true || process_id == 0) {
             // remove graph file
             if( remove(hgraph_file.c_str()) != 0 )
                 printf( "Error deleting temporary hgraph file %s\n",hgraph_file.c_str() );

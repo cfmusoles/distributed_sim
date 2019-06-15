@@ -20,7 +20,7 @@ template_4='''
 
 APP_NAME="distSim"
 TEST_ITERATIONS=1
-TEST_REPETITIONS=2
+TEST_REPETITIONS=1
 PROCESSES='''
 template_5='''
 EXPERIMENT_NAME='''
@@ -60,7 +60,7 @@ run_experiment() {
 	do
 		#aprun -n $P $APP_NAME -n $EXPERIMENT_NAME -c $COMM_PATTERN -p $DISTRIBUTION -s $SEED -k 500 -f 1000 -t 150 -m "cm" -i 24 -b $BM_FILE
 		sleep 1
-		aprun -n $P $APP_NAME -n $EXPERIMENT_NAME -c $COMM_PATTERN -p $DISTRIBUTION -s $SEED -k 100 -f 120 -t 150 -m "mvc" -i 24 -b $BM_FILE
+		aprun -n $P $APP_NAME -n $EXPERIMENT_NAME -c $COMM_PATTERN -p $DISTRIBUTION -s $SEED -k 100 -f 110 -t 150 -m "mvc" -i 24 -b $BM_FILE
 		sleep 1
 	done
 }
@@ -69,9 +69,9 @@ for r in $(seq 1 $TEST_ITERATIONS)
 do
 	SEED=$RANDOM
 	#run_experiment $PROCESSES "roundrobin" "nbx" $SEED 
-	run_experiment $PROCESSES "prawE" "nbx" $SEED 
+	#run_experiment $PROCESSES "prawE" "nbx" $SEED 
 	run_experiment $PROCESSES "prawV" "nbx" $SEED 
-	run_experiment $PROCESSES "hypergraphPartitioning" "nbx" $SEED 
+	#run_experiment $PROCESSES "hypergraphPartitioning" "nbx" $SEED 
 done
 
 '''
