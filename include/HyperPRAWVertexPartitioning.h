@@ -24,7 +24,7 @@ public:
 	virtual ~HyperPRAWVertexPartitioning() {}
 	
 	virtual void perform_partitioning(Model* model, int partitions, int process_id, std::vector<int>* previous_activity) {
-		int max_iterations = 100;
+		int max_iterations = 10;
         float imbalance_tolerance = 1.2f;
         
         if(partitions <= 1) {
@@ -33,7 +33,7 @@ public:
 		}
 
         // PREP DATA STRUCTURES
-        // initialise vertex weight values --> if model->null_compute then uniform; else number of incomming connections
+        // initialise vertex weight values
         int* he_wgt = (int*)calloc(model->population_size,sizeof(int));
         // Zoltan does consider this balance, so needs to be a fair comparison
         for(int ii=0; ii < model->population_size; ii++) {
@@ -71,44 +71,28 @@ public:
         // 3 Make sure all partitions have the final partitioning
         // 4 Clean up unused datastructures
 
-        // MASTER NODE creates hMETIS file
-        if(true || process_id == 0) {
-            // generate hMETIS file
-            // store model in file
-            PRINTF("%i: Storing model in file %s\n",process_id,hgraph_file.c_str());
-            FILE *fp = fopen(hgraph_file.c_str(), "w+");
-            
-            // write header: NUM_HYPEREDGES NUM_VERTICES
-            //  num hyperedges == number of vertices, since each hyperedge represents a presynaptic neuron and all its connecting post synaptic neighbours
-            fprintf(fp,"%lu %lu",model->population_size,model->population_size);
-            fprintf(fp,"\n");
+        // each NODE creates a stream (hMETIS file)
+        PRINTF("%i: Storing model in file %s\n",process_id,hgraph_file.c_str());
+        FILE *fp = fopen(hgraph_file.c_str(), "w+");
+        
+        // write header: NUM_HYPEREDGES NUM_VERTICES
+        //  num hyperedges == number of vertices, since each hyperedge represents a presynaptic neuron and all its connecting post synaptic neighbours
+        fprintf(fp,"%lu %lu\n",model->population_size,model->population_size);
 
-            std::vector<std::vector<int> > presynaptics(model->population_size);
-            // add presynaptic neuron to hyperedge lead by each post synaptic neuron. See HypergraphPartitioning
-            for(int ii=0; ii < model->population_size; ii++) {
-                for(int jj=0; jj < model->interconnections_size[ii]; jj++) {
-                    presynaptics[abs(model->interconnections[ii][jj])].push_back(ii);
-                }
-            }
-
-            // write connectivity per neuron id
-            for(int ii=0; ii < model->population_size; ii++) {
+        // write connectivity per neuron id
+        for(int ii=0; ii < model->population_size; ii++) {
+            if(ii % partitions == process_id) {
                 // write presynaptic neuron as first neuron
-                fprintf(fp,"%i ",ii + 1);
+                fprintf(fp,"%i",ii + 1);
                 // write all connections from ii
                 for(int jj=0; jj < model->interconnections_size[ii]; jj++) {
-                    fprintf(fp,"%i ",abs(model->interconnections[ii][jj]) + 1);
+                    fprintf(fp," %i",abs(model->interconnections[ii][jj]) + 1);
                 }
-                // write all connections to ii
-                /*for(int jj=0; jj < presynaptics[ii].size(); jj++) {
-                    fprintf(fp,"%i ",presynaptics[ii][jj] + 1);
-                } */
-                
                 fprintf(fp,"\n");
             }
-            fclose(fp);
+        }
+        fclose(fp);
 
-        } 
         // wait until file is generated
         MPI_Barrier(MPI_COMM_WORLD);
 
@@ -118,33 +102,27 @@ public:
         char experiment_name[filename.length() + 1]; 
         strcpy(experiment_name, filename.c_str()); 
         PRAW::ParallelHyperedgePartitioning(experiment_name,partitioning, comm_cost_matrix, hgraph_file.c_str(), he_wgt, max_iterations, imbalance_tolerance, true);
-        
+
         if(process_id == 0) {
-            if(!use_bandwidth_file && comm_bandwidth_filename != NULL)
+            /*if(!use_bandwidth_file && comm_bandwidth_filename != NULL)
                 PRAW::get_comm_cost_matrix_from_bandwidth(comm_bandwidth_filename,comm_cost_matrix,partitions,false);
                 
             float vertex_replication_factor;
             float max_hedge_imbalance;
             double total_sim_comm_cost;
             PRAW::getEdgeCentricPartitionStatsFromFile(partitioning, partitions, hgraph_file.c_str(), he_wgt,comm_cost_matrix,
-                                        &vertex_replication_factor, &max_hedge_imbalance, &total_sim_comm_cost);
+                                        &vertex_replication_factor, &max_hedge_imbalance, &total_sim_comm_cost);*/
             // store results?
         }
-
         free(he_wgt);
         for(int ii=0; ii < partitions; ii++) {
             free(comm_cost_matrix[ii]);
         }
         free(comm_cost_matrix);
 
-        // wait for all before deleting the hgraph file
-        MPI_Barrier(MPI_COMM_WORLD);
-
-        if(true || process_id == 0) {
-            // remove graph file
-            if( remove(hgraph_file.c_str()) != 0 )
-                printf( "Error deleting temporary hgraph file %s\n",hgraph_file.c_str() );
-        }
+        // remove graph file
+        if(remove(hgraph_file.c_str()) != 0 )
+            printf( "Error deleting temporary hgraph file %s\n",hgraph_file.c_str() );
 
 	}
 
