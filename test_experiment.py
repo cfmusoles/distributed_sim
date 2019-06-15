@@ -71,7 +71,7 @@ do
 	#run_experiment $PROCESSES "roundrobin" "nbx" $SEED 
 	#run_experiment $PROCESSES "prawE" "nbx" $SEED 
 	run_experiment $PROCESSES "prawV" "nbx" $SEED 
-	#run_experiment $PROCESSES "hypergraphPartitioning" "nbx" $SEED 
+	run_experiment $PROCESSES "hypergraphPartitioning" "nbx" $SEED 
 done
 
 '''

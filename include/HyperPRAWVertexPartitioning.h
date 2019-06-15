@@ -117,7 +117,7 @@ public:
         filename += "_prawParallel";
         char experiment_name[filename.length() + 1]; 
         strcpy(experiment_name, filename.c_str()); 
-        PRAW::ParallelHyperedgePartitioning(experiment_name,partitioning, comm_cost_matrix, hgraph_file.c_str(), he_wgt, max_iterations, imbalance_tolerance, false);
+        PRAW::ParallelHyperedgePartitioning(experiment_name,partitioning, comm_cost_matrix, hgraph_file.c_str(), he_wgt, max_iterations, imbalance_tolerance, true);
         
         if(process_id == 0) {
             if(!use_bandwidth_file && comm_bandwidth_filename != NULL)
