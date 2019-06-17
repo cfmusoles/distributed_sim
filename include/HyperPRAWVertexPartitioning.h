@@ -49,10 +49,11 @@ public:
             comm_cost_matrix[ii] = (double*)calloc(partitions,sizeof(double));
         }
 
-        if(use_bandwidth_file)
+        if(use_bandwidth_file) {
             PRAW::get_comm_cost_matrix_from_bandwidth(comm_bandwidth_filename,comm_cost_matrix,partitions,false);
-        else
+        } else {
             PRAW::get_comm_cost_matrix_from_bandwidth(NULL,comm_cost_matrix,partitions,false);
+        }            
         
         // temporary hMETIS file
         std::string hgraph_file = "model_";
