@@ -1527,13 +1527,13 @@ int main(int argc, char** argv) {
 				else partition = new CustomPartitioning(&pops,population_size,custom_partitioning);
 			} else if(strcmp(part_method,"prawE_without") == 0) {  
 				PRINTF("%i: Partitioning: edge partitioning PRAW\n",process_id);
-				partition = new HyperPRAWEdgePartitioning(&pops,population_size,comm_bandwidth_matrix_file,false,false);
+				partition = new HyperPRAWEdgePartitioning(&pops,population_size,comm_bandwidth_matrix_file,true,false);
 			} else if(strcmp(part_method,"prawV_without") == 0) {  
 				PRINTF("%i: Partitioning: vertex partitioning PRAW\n",process_id);
 				partition = new HyperPRAWVertexPartitioning(&pops,population_size,comm_bandwidth_matrix_file,false);
 			} else if(strcmp(part_method,"prawE") == 0) {  
 				PRINTF("%i: Partitioning: edge partitioning PRAW\n",process_id);
-				partition = new HyperPRAWEdgePartitioning(&pops,population_size,comm_bandwidth_matrix_file,false,true);
+				partition = new HyperPRAWEdgePartitioning(&pops,population_size,comm_bandwidth_matrix_file,true,true);
 			} else if(strcmp(part_method,"prawV") == 0) {  
 				PRINTF("%i: Partitioning: vertex partitioning PRAW\n",process_id);
 				partition = new HyperPRAWVertexPartitioning(&pops,population_size,comm_bandwidth_matrix_file,true);

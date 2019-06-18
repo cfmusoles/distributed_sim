@@ -25,7 +25,7 @@ public:
 	virtual ~HyperPRAWEdgePartitioning() {}
 	
 	virtual void perform_partitioning(Model* model, int partitions, int process_id, std::vector<int>* previous_activity) {
-		int max_iterations = 150;
+		int max_iterations = 100;
         float imbalance_tolerance = 1.1f;
         
         if(partitions <= 1) {
@@ -135,12 +135,12 @@ public:
             filename += "_prawParallel";
             char experiment_name[filename.length() + 1]; 
             strcpy(experiment_name, filename.c_str()); 
-            PRAW::ParallelIndependentRestreamingPartitioning(experiment_name,partitioning,comm_cost_matrix, hgraph_file.c_str(),vtx_wgt,max_iterations, imbalance_tolerance,ta_refine,true,stopping_condition,false);
+            PRAW::ParallelHyperedgePartitioning(experiment_name,partitioning,comm_cost_matrix, hgraph_file.c_str(),vtx_wgt,max_iterations, imbalance_tolerance,ta_refine,true,stopping_condition,false);
         } else {
             filename += "_prawSequential";
             char experiment_name[filename.length() + 1]; 
             strcpy(experiment_name, filename.c_str()); 
-            PRAW::SequentialStreamingPartitioning(experiment_name,partitioning,partitions,comm_cost_matrix, hgraph_file.c_str(),vtx_wgt,max_iterations, imbalance_tolerance,ta_refine,true,stopping_condition, false);
+            PRAW::SequentialHyperedgePartitioning(experiment_name,partitioning,partitions,comm_cost_matrix, hgraph_file.c_str(),vtx_wgt,max_iterations, imbalance_tolerance,ta_refine,true,stopping_condition, false);
         }
 
         if(process_id == 0) {
