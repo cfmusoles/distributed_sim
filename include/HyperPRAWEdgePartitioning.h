@@ -98,11 +98,11 @@ public:
 
             std::vector<std::vector<int> > presynaptics(model->population_size);
             // add presynaptic neuron to hyperedge lead by each post synaptic neuron. See HypergraphPartitioning
-            for(int ii=0; ii < model->population_size; ii++) {
-                for(int jj=0; jj < model->interconnections_size[ii]; jj++) {
-                    presynaptics[abs(model->interconnections[ii][jj])].push_back(ii);
-                }
-            }
+            //for(int ii=0; ii < model->population_size; ii++) {
+            //    for(int jj=0; jj < model->interconnections_size[ii]; jj++) {
+            //        presynaptics[abs(model->interconnections[ii][jj])].push_back(ii);
+            //    }
+            //}
 
             // write connectivity per neuron id
             for(int ii=0; ii < model->population_size; ii++) {
@@ -113,18 +113,24 @@ public:
                     fprintf(fp,"%i ",abs(model->interconnections[ii][jj]) + 1);
                 }
                 // write all connections to ii
-                /*for(int jj=0; jj < presynaptics[ii].size(); jj++) {
-                    fprintf(fp,"%i ",presynaptics[ii][jj] + 1);
-                } */
+                //for(int jj=0; jj < presynaptics[ii].size(); jj++) {
+                //    fprintf(fp,"%i ",presynaptics[ii][jj] + 1);
+                //}
                 
                 fprintf(fp,"\n");
             }
             fclose(fp);
 
-        } else {
-            // wait until the file is generated
+        } 
 
+        // alternative stream (each line is all hyperedges that contain a single vertex)
+        std::vector<std::vector<int> > he_stream;
+        for(int vid=0; vid < model->population_size; vid++) {
+            if(vid % partitions == process_id) {
+
+            }
         }
+
         MPI_Barrier(MPI_COMM_WORLD);
 
         // define algorithmic parameters
@@ -136,6 +142,8 @@ public:
             char experiment_name[filename.length() + 1]; 
             strcpy(experiment_name, filename.c_str()); 
             PRAW::ParallelHyperedgePartitioning(experiment_name,partitioning,comm_cost_matrix, hgraph_file.c_str(),vtx_wgt,max_iterations, imbalance_tolerance,ta_refine,true,stopping_condition,false);
+            // alternative method (based on Alistairh streaming, only one vertex with all its hyperedges at a time)
+            //PRAW::ParallelHyperedgePartitioning_he_stream(experiment_name,partitioning,comm_cost_matrix, model->population_size,&he_stream,vtx_wgt,max_iterations, imbalance_tolerance,false);
         } else {
             filename += "_prawSequential";
             char experiment_name[filename.length() + 1]; 

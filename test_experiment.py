@@ -60,7 +60,7 @@ run_experiment() {
 	do
 		#aprun -n $P $APP_NAME -n $EXPERIMENT_NAME -c $COMM_PATTERN -p $DISTRIBUTION -s $SEED -k 500 -f 1000 -t 150 -m "cm" -i 24 -b $BM_FILE
 		sleep 1
-		aprun -n $P $APP_NAME -n $EXPERIMENT_NAME -c $COMM_PATTERN -p $DISTRIBUTION -s $SEED -k 100 -f 100 -t 200 -m "mvc" -i 24 -b $BM_FILE
+		aprun -n $P $APP_NAME -n $EXPERIMENT_NAME -c $COMM_PATTERN -p $DISTRIBUTION -s $SEED -k 80 -f 100 -t 300 -m "mvc" -i 24 -b $BM_FILE
 		sleep 1
 	done
 }
@@ -71,7 +71,7 @@ do
 	#run_experiment $PROCESSES "roundrobin" "nbx" $SEED 
 	run_experiment $PROCESSES "prawE" "nbx" $SEED 
 	#run_experiment $PROCESSES "prawV" "nbx" $SEED 
-	#run_experiment $PROCESSES "hypergraphPartitioning" "nbx" $SEED 
+	run_experiment $PROCESSES "hypergraphPartitioning" "nbx" $SEED 
 done
 
 '''

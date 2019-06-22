@@ -1,6 +1,6 @@
 //#define API_PROFILING					// Scalasca User API profiling
 //#define RECORD_STATISTICS				// Store network activity and stats in files
-//#define RECORD_ACTIVITY					// store neuron activity in file
+#define RECORD_ACTIVITY					// store neuron activity in file
 //#define RECORD_PROCESSES_ACTIVITY		// store processes timings (one file per process)
 //#define RECORD_PROCESS_TRACE			// store processes trace information (timing for compute, comm, etc.)
 //#define MEASURE_IDLE_TIME				// Separate comm into process idle (wait for others) and sync time
@@ -1526,14 +1526,17 @@ int main(int argc, char** argv) {
 				if(custom_partitioning == NULL) partition = new RandomPartitioning(&pops,population_size);
 				else partition = new CustomPartitioning(&pops,population_size,custom_partitioning);
 			} else if(strcmp(part_method,"prawE_without") == 0) {  
-				PRINTF("%i: Partitioning: edge partitioning PRAW\n",process_id);
+				PRINTF("%i: Partitioning: parallel edge partitioning PRAW\n",process_id);
 				partition = new HyperPRAWEdgePartitioning(&pops,population_size,comm_bandwidth_matrix_file,true,false);
 			} else if(strcmp(part_method,"prawV_without") == 0) {  
 				PRINTF("%i: Partitioning: vertex partitioning PRAW\n",process_id);
 				partition = new HyperPRAWVertexPartitioning(&pops,population_size,comm_bandwidth_matrix_file,false);
 			} else if(strcmp(part_method,"prawE") == 0) {  
-				PRINTF("%i: Partitioning: edge partitioning PRAW\n",process_id);
+				PRINTF("%i: Partitioning: parallel edge partitioning PRAW\n",process_id);
 				partition = new HyperPRAWEdgePartitioning(&pops,population_size,comm_bandwidth_matrix_file,true,true);
+			} else if(strcmp(part_method,"prawS") == 0) {  
+				PRINTF("%i: Partitioning: sequential edge partitioning PRAW\n",process_id);
+				partition = new HyperPRAWEdgePartitioning(&pops,population_size,comm_bandwidth_matrix_file,false,true);
 			} else if(strcmp(part_method,"prawV") == 0) {  
 				PRINTF("%i: Partitioning: vertex partitioning PRAW\n",process_id);
 				partition = new HyperPRAWVertexPartitioning(&pops,population_size,comm_bandwidth_matrix_file,true);
