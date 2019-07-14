@@ -14,13 +14,13 @@ template_2 = '''
 template_3=''':bigmem='''
 template_4='''
 # walltime
-#PBS -l walltime=4:00:0
+#PBS -l walltime=6:00:0
 # budget code
 #PBS -A e582
 
 APP_NAME="distSim"
 TEST_ITERATIONS=1
-TEST_REPETITIONS=1
+TEST_REPETITIONS=2
 PROCESSES='''
 template_5='''
 EXPERIMENT_NAME='''
@@ -70,7 +70,7 @@ do
 	SEED=$RANDOM
 	#run_experiment $PROCESSES "roundrobin" "nbx" $SEED 
 	run_experiment $PROCESSES "prawE" "nbx" $SEED 
-	#run_experiment $PROCESSES "prawV" "nbx" $SEED 
+	run_experiment $PROCESSES "prawE_without" "nbx" $SEED 
 	run_experiment $PROCESSES "hypergraphPartitioning" "nbx" $SEED 
 done
 

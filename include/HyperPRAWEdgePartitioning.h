@@ -45,19 +45,6 @@ public:
                 vtx_wgt[abs(model->interconnections[ii][jj])] += 1;
             }
         }
-        /*if(!model->null_compute) {
-            // weight of computation associated to incoming synapses
-            // assume all to all connectivity within a hyperedge (needs to match how model->interconnectivity is constructed)
-            for(int ii=0; ii < model->population_size; ii++) {
-                for(int jj=0; jj < hedge_ptr[ii].size(); jj++) {
-                    int he_id = hedge_ptr[ii][jj];
-                    for(int kk=0; kk < hyperedges[he_id].size(); kk++) {
-                        int to = hyperedges[he_id][kk];
-                        vtx_wgt[to] += hyperedges[he_id].size()-1;
-                    }
-                }
-            }
-        }*/
 
         // p2p communication cost estimates from file
         double** comm_cost_matrix = (double**)malloc(sizeof(double*) * partitions);
@@ -70,13 +57,7 @@ public:
         else
             PRAW::get_comm_cost_matrix_from_bandwidth(NULL,comm_cost_matrix,partitions,false);
         
-        // temporary hMETIS file
-        std::string hgraph_file = "model_";
-        char str_int[16];
-        sprintf(str_int,"%i",partitions);
-        hgraph_file += str_int;
-        hgraph_file += ".hgr";
-
+        
         // 1 Save current model to hMETIS format file (only one process needs to do this)
         //      Header: num_hyperedges num_vertices
         //      each line after that: a hyperedge which lists the contained vertices
@@ -84,6 +65,15 @@ public:
         // 3 Make sure all partitions have the final partitioning
         // 4 Clean up unused datastructures
 
+        /////////////////////////////////////////
+        //for PRAW::ParallelHyperedgePartitioning
+        /////////////////////////////////////////
+        // temporary hMETIS file
+        /*std::string hgraph_file = "model_";
+        char str_int[16];
+        sprintf(str_int,"%i",partitions);
+        hgraph_file += str_int;
+        hgraph_file += ".hgr";
         // MASTER NODE creates hMETIS file
         if(process_id == 0) {
             // generate hMETIS file
@@ -96,14 +86,6 @@ public:
             fprintf(fp,"%lu %lu",model->population_size,model->population_size);
             fprintf(fp,"\n");
 
-            std::vector<std::vector<int> > presynaptics(model->population_size);
-            // add presynaptic neuron to hyperedge lead by each post synaptic neuron. See HypergraphPartitioning
-            //for(int ii=0; ii < model->population_size; ii++) {
-            //    for(int jj=0; jj < model->interconnections_size[ii]; jj++) {
-            //        presynaptics[abs(model->interconnections[ii][jj])].push_back(ii);
-            //    }
-            //}
-
             // write connectivity per neuron id
             for(int ii=0; ii < model->population_size; ii++) {
                 // write presynaptic neuron as first neuron
@@ -112,26 +94,75 @@ public:
                 for(int jj=0; jj < model->interconnections_size[ii]; jj++) {
                     fprintf(fp,"%i ",abs(model->interconnections[ii][jj]) + 1);
                 }
-                // write all connections to ii
-                //for(int jj=0; jj < presynaptics[ii].size(); jj++) {
-                //    fprintf(fp,"%i ",presynaptics[ii][jj] + 1);
-                //}
                 
                 fprintf(fp,"\n");
             }
             fclose(fp);
 
-        } 
+        }
+        ////////////////////////////////////////
+         */
 
-        // alternative stream (each line is all hyperedges that contain a single vertex)
-        std::vector<std::vector<int> > he_stream;
-        for(int vid=0; vid < model->population_size; vid++) {
-            if(vid % partitions == process_id) {
 
+        /////////////////////////////////////////
+        //for PRAW::ParallelHDRF
+        /////////////////////////////////////////
+        std::string hgraph_file = "model_";
+        hgraph_file += "_";
+        char str_int[16];
+        sprintf(str_int,"%i",partitions);
+        hgraph_file += str_int;
+        hgraph_file += "_";
+        sprintf(str_int,"%i",process_id);
+        hgraph_file += str_int;
+        hgraph_file += ".hgr";
+        // create hMETIS file (distributed format)
+        // each line represents a vertex
+        // the contents of the line are the hyperedge ids that vertex belongs to
+        // generate intermediate datastructure with list of hedge ids
+
+        std::vector<std::vector<int> > hedge_ptr;
+        hedge_ptr.resize(ceil((float)model->population_size / partitions));
+        // read reminder of file (one line per hyperedge)
+        int counter = 1;
+        for(int ii=0; ii < model->population_size; ii++) {
+            // account for presynaptic neuron, as it belongs to the hyperedge too
+            int pre_syn_vertex = ii;
+            if(pre_syn_vertex % partitions == process_id) {
+                hedge_ptr[pre_syn_vertex / partitions].push_back(counter);
             }
+            // all postsynaptic connections
+            for(int jj=0; jj < model->interconnections_size[ii]; jj++) {
+                int vertex_id = abs(model->interconnections[ii][jj]);
+                if(vertex_id % partitions == process_id) {
+                    hedge_ptr[vertex_id / partitions].push_back(counter);
+                }
+            }
+            counter++;            
         }
 
-        MPI_Barrier(MPI_COMM_WORLD);
+        // create hMETIS (distributed format) file
+        PRINTF("%i: Storing model in file %s\n",process_id,hgraph_file.c_str());
+        FILE *fp = fopen(hgraph_file.c_str(), "w+");
+        
+        // write header: NUM_HYPEREDGES NUM_VERTICES
+        //  num hyperedges == number of vertices, since each hyperedge represents a presynaptic neuron and all its connecting post synaptic neighbours
+        fprintf(fp,"%lu %lu",model->population_size,model->population_size);
+        fprintf(fp,"\n");
+
+        for(int ii=0; ii < hedge_ptr.size(); ii++) {
+            for(int he=0; he < hedge_ptr[ii].size(); he++) {
+                fprintf(fp,"%i ",hedge_ptr[ii][he]);
+            }
+            fprintf(fp,"\n");
+            
+        }
+        fclose(fp);
+        //////////////////////////////////////////////////////
+
+
+
+        MPI_Barrier(MPI_COMM_WORLD); 
 
         // define algorithmic parameters
         float ta_refine = 0.95f;
@@ -141,9 +172,10 @@ public:
             filename += "_prawParallel";
             char experiment_name[filename.length() + 1]; 
             strcpy(experiment_name, filename.c_str()); 
-            PRAW::ParallelHyperedgePartitioning(experiment_name,partitioning,comm_cost_matrix, hgraph_file.c_str(),vtx_wgt,max_iterations, imbalance_tolerance,ta_refine,true,stopping_condition,false);
+            //PRAW::ParallelHyperedgePartitioning(experiment_name,partitioning,comm_cost_matrix, hgraph_file.c_str(),vtx_wgt,max_iterations, imbalance_tolerance,ta_refine,true,stopping_condition,false);
             // alternative method (based on Alistairh streaming, only one vertex with all its hyperedges at a time)
             //PRAW::ParallelHyperedgePartitioning_he_stream(experiment_name,partitioning,comm_cost_matrix, model->population_size,&he_stream,vtx_wgt,max_iterations, imbalance_tolerance,false);
+            PRAW::ParallelHDRF(experiment_name,partitioning, comm_cost_matrix, hgraph_file, vtx_wgt, max_iterations, imbalance_tolerance, false);
         } else {
             filename += "_prawSequential";
             char experiment_name[filename.length() + 1]; 
@@ -168,11 +200,14 @@ public:
         // wait for all before deleting the hgraph file
         MPI_Barrier(MPI_COMM_WORLD);
 
-        if(process_id == 0) {
+        // remove hMETIS files
+        /*if(process_id == 0) {
             // remove graph file
             if( remove(hgraph_file.c_str()) != 0 )
                 printf( "Error deleting temporary hgraph file %s\n",hgraph_file.c_str() );
-        }
+        }*/
+        if( remove(hgraph_file.c_str()) != 0 )
+            printf( "Error deleting temporary hgraph file %s\n",hgraph_file.c_str() );
 
 	}
 
