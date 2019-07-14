@@ -34,11 +34,11 @@ public:
 		}
 
         // PREP DATA STRUCTURES
-        // initialise vertex weight values --> if model->null_compute then uniform; else number of incomming connections
+        // initialise vertex weight values
         int* vtx_wgt = (int*)calloc(model->population_size,sizeof(int));
-        /*for(int ii =0; ii < model->population_size; ii++) {
+        for(int ii =0; ii < model->population_size; ii++) {
             vtx_wgt[ii] = 1;
-        }*/
+        }
         // Zoltan does consider this balance, so needs to be a fair comparison
         for(int ii=0; ii < model->population_size; ii++) {
             for(int jj=0; jj < model->interconnections_size[ii]; jj++) {
@@ -121,8 +121,7 @@ public:
         // the contents of the line are the hyperedge ids that vertex belongs to
         // generate intermediate datastructure with list of hedge ids
 
-        std::vector<std::vector<int> > hedge_ptr;
-        hedge_ptr.resize(ceil((float)model->population_size / partitions));
+        std::vector<std::vector<int> > hedge_ptr(ceil((float)model->population_size / partitions));
         // read reminder of file (one line per hyperedge)
         int counter = 1;
         for(int ii=0; ii < model->population_size; ii++) {
@@ -175,7 +174,7 @@ public:
             //PRAW::ParallelHyperedgePartitioning(experiment_name,partitioning,comm_cost_matrix, hgraph_file.c_str(),vtx_wgt,max_iterations, imbalance_tolerance,ta_refine,true,stopping_condition,false);
             // alternative method (based on Alistairh streaming, only one vertex with all its hyperedges at a time)
             //PRAW::ParallelHyperedgePartitioning_he_stream(experiment_name,partitioning,comm_cost_matrix, model->population_size,&he_stream,vtx_wgt,max_iterations, imbalance_tolerance,false);
-            PRAW::ParallelHDRF(experiment_name,partitioning, comm_cost_matrix, hgraph_file, vtx_wgt, max_iterations, imbalance_tolerance, false);
+            PRAW::ParallelHDRF(experiment_name,partitioning, comm_cost_matrix, hgraph_file, vtx_wgt, max_iterations, imbalance_tolerance, true);
         } else {
             filename += "_prawSequential";
             char experiment_name[filename.length() + 1]; 

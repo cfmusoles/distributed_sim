@@ -3,7 +3,7 @@
 #define RECORD_ACTIVITY					// store neuron activity in file
 //#define RECORD_PROCESSES_ACTIVITY		// store processes timings (one file per process)
 //#define RECORD_PROCESS_TRACE			// store processes trace information (timing for compute, comm, etc.)
-//#define MEASURE_IDLE_TIME				// Separate comm into process idle (wait for others) and sync time
+#define MEASURE_IDLE_TIME				// Separate comm into process idle (wait for others) and sync time
 //#define ADVANCED_COMM_STATS				// store, for each communication, size of message
 #define ADVANCED_COMM_STATS_MATRIX_ONLY	// only store process-to-process total messaging (not individual message size) 
 #define VERBOSE						// display debugging information (build time)
