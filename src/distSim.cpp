@@ -456,10 +456,10 @@ int main(int argc, char** argv) {
 		c_params->w_inh_g = -4.0f;			// g is a multiplier factor with respect to W_EXC
 		c_params->exc_tau_s = 0.5f;			// time constant for exc synapses (ms) 
 		c_params->inh_tau_s = 0.5f;		// time constant for inh synapses (ms) 
-		c_params->exc_delay_mean = 1.6f;	// delay on exc synaptic propagation (ms) was 1.5
-		c_params->exc_delay_dev = 0.0f;		// delay on exc synaptic propagation (ms) was 0.7
+		c_params->exc_delay_mean = 1.5f;	// delay on exc synaptic propagation (ms) was 1.5
+		c_params->exc_delay_dev = 0.7f;		// delay on exc synaptic propagation (ms) was 0.7
 		c_params->inh_delay_mean = 0.8f;	// delay on inh synaptic propagation (ms)
-		c_params->inh_delay_dev = 0.0f;		// delay on inh synaptic propagation (ms) was 0.4
+		c_params->inh_delay_dev = 0.4f;		// delay on inh synaptic propagation (ms) was 0.4
 			
 		// populations
 		int n_full[8] = {20683,5834,21915, 5479,4850,1065,14395,2948};
