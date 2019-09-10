@@ -37,7 +37,8 @@ run_experiment() {
 	PRUNE="$5"
 	for i in $(seq 1 $REPETITIONS)
 	do
-		aprun -n $P $APP_NAME -n $EXPERIMENT_NAME -c $COMM_PATTERN -p $DISTRIBUTION -s $SEED -k 1000 -f 160 -t 350 -m "mvc" -i 24
+		#aprun -n $P $APP_NAME -n $EXPERIMENT_NAME -c $COMM_PATTERN -p $DISTRIBUTION -s $SEED -k 1000 -f 160 -t 350 -m "mvc" -i 24
+		aprun -n $P $APP_NAME -n $EXPERIMENT_NAME -c $COMM_PATTERN -p $DISTRIBUTION -s $SEED -k 1000 -f 1000 -t 750 -m "cm" -i 24
 		sleep 1
 	done
 	if [ $PRUNE == "yes" ]
@@ -52,9 +53,9 @@ cd $PBS_O_WORKDIR
 for r in $(seq 1 $ITERATIONS)
 do
 	SEED=$RANDOM
-	run_experiment $PROCESSES "roundrobin" "pex" $SEED "no"
-	#run_experiment $PROCESSES "randomBalanced" "pex" $SEED "no"
-	run_experiment $PROCESSES "hypergraphPartitioning" "nbx" $SEED "no"
+	#run_experiment $PROCESSES "roundrobin" "pex" $SEED "no"
+	run_experiment $PROCESSES "randomBalanced" "pex" $SEED "no"
+	#run_experiment $PROCESSES "hypergraphPartitioning" "nbx" $SEED "no"
 done
 
 '''

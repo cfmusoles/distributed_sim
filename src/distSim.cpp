@@ -1,12 +1,12 @@
 //#define API_PROFILING					// Scalasca User API profiling
 //#define RECORD_STATISTICS				// Store network activity and stats in files
-#define RECORD_ACTIVITY					// store neuron activity in file
+//#define RECORD_ACTIVITY					// store neuron activity in file
 //#define RECORD_PROCESSES_ACTIVITY		// store processes timings (one file per process)
 //#define RECORD_PROCESS_TRACE			// store processes trace information (timing for compute, comm, etc.)
 #define MEASURE_IDLE_TIME				// Separate comm into process idle (wait for others) and sync time
 //#define ADVANCED_COMM_STATS				// store, for each communication, size of message
-#define ADVANCED_COMM_STATS_MATRIX_ONLY	// only store process-to-process total messaging (not individual message size) 
-#define VERBOSE						// display debugging information (build time)
+//#define ADVANCED_COMM_STATS_MATRIX_ONLY	// only store process-to-process total messaging (not individual message size) 
+//#define VERBOSE						// display debugging information (build time)
 //#define PARTITION_CONNECTIVITY_GRAPH	// store partition connectivity graph
 					
 
@@ -456,10 +456,10 @@ int main(int argc, char** argv) {
 		c_params->w_inh_g = -4.0f;			// g is a multiplier factor with respect to W_EXC
 		c_params->exc_tau_s = 0.5f;			// time constant for exc synapses (ms) 
 		c_params->inh_tau_s = 0.5f;		// time constant for inh synapses (ms) 
-		c_params->exc_delay_mean = 1.5f;	// delay on exc synaptic propagation (ms)
-		c_params->exc_delay_dev = 0.7f;		// delay on exc synaptic propagation (ms) was 0.7
+		c_params->exc_delay_mean = 1.6f;	// delay on exc synaptic propagation (ms) was 1.5
+		c_params->exc_delay_dev = 0.0f;		// delay on exc synaptic propagation (ms) was 0.7
 		c_params->inh_delay_mean = 0.8f;	// delay on inh synaptic propagation (ms)
-		c_params->inh_delay_dev = 0.4f;		// delay on inh synaptic propagation (ms) was 0.4
+		c_params->inh_delay_dev = 0.0f;		// delay on inh synaptic propagation (ms) was 0.4
 			
 		// populations
 		int n_full[8] = {20683,5834,21915, 5479,4850,1065,14395,2948};
