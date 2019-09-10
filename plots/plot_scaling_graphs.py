@@ -20,7 +20,7 @@ show_plot_title = False
 
 folder = "../results/archer/data/"
 # each element on the following arrays corresponds to an experiment run (collection of files)
-experiments = ["baseline_strong_randomBalanced_pex","bundle_randomBalanced_pex"]#,"sparse_comm_st_hypergraphPartitioning_pex_pruned","sparse_comm_st_hypergraphPartitioning_nbx_pruned"] # plot more than one set of results in the graphs
+experiments = ["nobundle_randomBalanced_pex","bundle_randomBalanced_pex"]#,"sparse_comm_st_hypergraphPartitioning_pex_pruned","sparse_comm_st_hypergraphPartitioning_nbx_pruned"] # plot more than one set of results in the graphs
 colours = ["red","green","blue","orange"] # as many as the number of experiments included
 legend_labels = ['delay = t_step','delay = t_step * 8','Hypergraph partition-PEX','Hypergraph partition-NBX']
 

@@ -38,7 +38,7 @@ run_experiment() {
 	for i in $(seq 1 $REPETITIONS)
 	do
 		#aprun -n $P $APP_NAME -n $EXPERIMENT_NAME -c $COMM_PATTERN -p $DISTRIBUTION -s $SEED -k 1000 -f 160 -t 350 -m "mvc" -i 24
-		aprun -n $P $APP_NAME -n $EXPERIMENT_NAME -c $COMM_PATTERN -p $DISTRIBUTION -s $SEED -k 1000 -f 1000 -t 750 -m "cm" -i 24
+		aprun -n $P $APP_NAME -n $EXPERIMENT_NAME -c $COMM_PATTERN -p $DISTRIBUTION -s $SEED -k 500 -f 1000 -t 750 -m "cm" -i 24
 		sleep 1
 	done
 	if [ $PRUNE == "yes" ]

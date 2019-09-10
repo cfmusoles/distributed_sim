@@ -1917,7 +1917,7 @@ int main(int argc, char** argv) {
 				// update local synapses 
 				// storing local neuron references in a contiguous array saves each process
 				// from having to comb the entire g_synapses array
-				if(!model.null_compute) {
+				if(!model.null_compute && local_synapses > 0) {
 					Synapse* syn;
 					for(syn = &localSynapses[0], ii=0; ii < local_synapses; ii++) {
 						syn->update_current(current_t);
@@ -1941,7 +1941,7 @@ int main(int argc, char** argv) {
 				
 				// solve neuron state
 				fired.clear();
-				if(!model.null_compute) {
+				if(!model.null_compute && local_neurons > 0) {
 					// storing local neuron references in a contiguous array saves each process
 					// from having to comb the entire neurons array and testing if local (most of which won't be local)
 					Neuron* neuron;
