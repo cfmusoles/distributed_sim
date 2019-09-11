@@ -25,11 +25,11 @@ public:
 			int post_size = model->interconnections_size[ii];
 			for(int jj=0; jj < post_size; jj++) {
 				int to = abs(model->interconnections[ii][jj]);
-				// Take into consideration synaptic computational load to weight vertices load 
-				vwgt_v[to]++;
 				// ignore looping connections (pre and post neurons are identical)
 				// causes ParMETIS non-symmetric adjacency matrix error "key X not found"
 				if(from == to) continue;
+				// Take into consideration synaptic computational load to weight vertices load 
+				vwgt_v[to]++;
 				cons_double[from].insert(to);
 				cons_double[to].insert(from);
 			}

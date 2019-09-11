@@ -54,8 +54,9 @@ for r in $(seq 1 $ITERATIONS)
 do
 	SEED=$RANDOM
 	#run_experiment $PROCESSES "roundrobin" "pex" $SEED "no"
-	run_experiment $PROCESSES "randomBalanced" "pex" $SEED "no"
-	#run_experiment $PROCESSES "hypergraphPartitioning" "nbx" $SEED "no"
+	#run_experiment $PROCESSES "randomBalanced" "pex" $SEED "no"
+	run_experiment $PROCESSES "hypergraphPartitioning" "nbx" $SEED "no"
+	run_experiment $PROCESSES "parallelPartitioning" "nbx" $SEED "no"
 done
 
 '''

@@ -6,7 +6,7 @@
 #define MEASURE_IDLE_TIME				// Separate comm into process idle (wait for others) and sync time
 //#define ADVANCED_COMM_STATS				// store, for each communication, size of message
 //#define ADVANCED_COMM_STATS_MATRIX_ONLY	// only store process-to-process total messaging (not individual message size) 
-//#define VERBOSE						// display debugging information (build time)
+#define VERBOSE						// display debugging information (build time)
 //#define PARTITION_CONNECTIVITY_GRAPH	// store partition connectivity graph
 					
 
