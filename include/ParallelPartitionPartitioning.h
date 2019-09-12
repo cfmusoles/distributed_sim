@@ -18,7 +18,7 @@ public:
 		
 		std::vector<std::set<int> > cons_double(model->population_size,std::set<int>());
 		std::vector<idx_t> vwgt_v(model->population_size,1);
-		
+		int count = 0;
 		int pre_size = model->population_size;
 		for(int ii=0; ii < pre_size; ii++) {
 			int from = ii;
@@ -45,12 +45,14 @@ public:
 		idx_t connection_index = 0;
 		pre_size = cons_double.size();
 		for(int ii=0; ii < pre_size; ii++) {
-			xadj_v[ii] = connection_index; // WHAT HAPPENS IF A NEURON DOES NOT HAVE ANY OUTWARD CONNECTION??
+			xadj_v[ii] = connection_index; 
 			int post_size = cons_double[ii].size();
 			if(post_size == 0) {
-				adjncy_v.push_back(ii);
+				// WHAT HAPPENS IF A NEURON DOES NOT HAVE ANY OUTWARD CONNECTION??
+				// Because the matrix needs  to be symmetric, nothing should be added
+				/*adjncy_v.push_back(ii);
 				adjwgt_v.push_back(1);
-				connection_index++;
+				connection_index++;*/
 			} else {
 				for (std::set<int>::iterator it = cons_double[ii].begin(); it != cons_double[ii].end(); ++it) {
 					adjncy_v.push_back(*it);
