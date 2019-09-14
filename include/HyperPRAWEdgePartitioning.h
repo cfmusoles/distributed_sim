@@ -105,7 +105,7 @@ public:
 
 
         /////////////////////////////////////////
-        //for PRAW::ParallelHDRF
+        //for PRAW::ParallelHDRF (rHDRF)
         /////////////////////////////////////////
         std::string hgraph_file = "model_";
         hgraph_file += "_";

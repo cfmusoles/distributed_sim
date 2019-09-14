@@ -14,7 +14,7 @@ template_2 = '''
 template_3=''':bigmem='''
 template_4='''
 # walltime
-#PBS -l walltime=1:00:0
+#PBS -l walltime=4:00:0
 # budget code
 #PBS -A e582
 
@@ -26,6 +26,28 @@ PROCESSES='''
 template_5='''
 EXPERIMENT_NAME='''
 template_6='''
+# This shifts to the directory that you submitted the job from
+cd $PBS_O_WORKDIR
+
+# bandwidth probing parameters
+SIZE=512
+ITERATIONS=20
+WINDOW=10
+# bandwidth matrix creation
+#renaming is necessary to avoid clashes between simultaneous jobs
+ORIGINAL_BM_FILE="results_mpi_send_bandwidth_"$PROCESSES
+aprun -n $PROCESSES mpi_perf $SIZE $ITERATIONS $WINDOW
+for p in $(seq 1 10)
+do
+	FILENAME="results_mpi_send_bandwidth_"$p"_"$PROCESSES
+	if [ ! -f $FILENAME ]; then
+	    BM_FILE="results_mpi_send_bandwidth_"$p"_"$PROCESSES
+	    break
+	fi
+done
+
+mv $ORIGINAL_BM_FILE $BM_FILE
+
 #two args:
 # $1 > distribution algorithm used by simulator
 # $2 > if results should be pruned
@@ -37,8 +59,8 @@ run_experiment() {
 	PRUNE="$5"
 	for i in $(seq 1 $REPETITIONS)
 	do
-		#aprun -n $P $APP_NAME -n $EXPERIMENT_NAME -c $COMM_PATTERN -p $DISTRIBUTION -s $SEED -k 1000 -f 160 -t 350 -m "mvc" -i 24
-		aprun -n $P $APP_NAME -n $EXPERIMENT_NAME -c $COMM_PATTERN -p $DISTRIBUTION -s $SEED -k 500 -f 1000 -t 750 -m "cm" -i 24
+		aprun -n $P $APP_NAME -n $EXPERIMENT_NAME -c $COMM_PATTERN -p $DISTRIBUTION -s $SEED -k 1000 -f 160 -t 700 -m "mvc" -i 24 -b $BM_FILE
+		#aprun -n $P $APP_NAME -n $EXPERIMENT_NAME -c $COMM_PATTERN -p $DISTRIBUTION -s $SEED -k 500 -f 1000 -t 750 -m "cm" -i 24 -b $BM_FILE
 		sleep 1
 	done
 	if [ $PRUNE == "yes" ]
@@ -47,16 +69,19 @@ run_experiment() {
 	fi
 }
 
-# This shifts to the directory that you submitted the job from
-cd $PBS_O_WORKDIR
+
+
 
 for r in $(seq 1 $ITERATIONS)
 do
 	SEED=$RANDOM
-	#run_experiment $PROCESSES "roundrobin" "pex" $SEED "no"
-	run_experiment $PROCESSES "parallelPartitioning" "nbx" $SEED "no"
-	run_experiment $PROCESSES "randomBalanced" "pex" $SEED "no"
 	run_experiment $PROCESSES "hypergraphPartitioning" "nbx" $SEED "no"
+	run_experiment $PROCESSES "prawE" "nbx" $SEED "no"
+	run_experiment $PROCESSES "prawE_without" "nbx" $SEED "no"
+	run_experiment $PROCESSES "roundrobin" "pex" $SEED "no"
+	run_experiment $PROCESSES "parallelPartitioning" "nbx" $SEED "no"
+	#run_experiment $PROCESSES "randomBalanced" "pex" $SEED "no"
+	
 done
 
 '''
