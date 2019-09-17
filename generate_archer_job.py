@@ -31,12 +31,12 @@ cd $PBS_O_WORKDIR
 
 # bandwidth probing parameters
 SIZE=512
-ITERATIONS=20
+ITERS=20
 WINDOW=10
 # bandwidth matrix creation
 #renaming is necessary to avoid clashes between simultaneous jobs
 ORIGINAL_BM_FILE="results_mpi_send_bandwidth_"$PROCESSES
-aprun -n $PROCESSES mpi_perf $SIZE $ITERATIONS $WINDOW
+aprun -n $PROCESSES mpi_perf $SIZE $ITERS $WINDOW
 for p in $(seq 1 10)
 do
 	FILENAME="results_mpi_send_bandwidth_"$p"_"$PROCESSES
