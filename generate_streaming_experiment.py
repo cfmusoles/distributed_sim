@@ -52,35 +52,24 @@ done
 
 mv $ORIGINAL_BM_FILE $BM_FILE
 
-#two args:
-# $1 > distribution algorithm used by simulator
-# $2 > if results should be pruned
-run_experiment() {
-	P="$1"
-	PARTITIONING="$2"
-	COMM_PATTERN="$3"
-	SEED="$4"
-	ACTIVITY_FILE=$EXPERIMENT_NAME"_"$PARTITIONING"_"$COMM_PATTERN"__"$P"_neuron_activity"
 
-	for i in $(seq 1 $REPETITIONS)
-	do
-		aprun -n $P $APP_NAME -n $EXPERIMENT_NAME -c $COMM_PATTERN -p $PARTITIONING -s $SEED -k 1000 -f 160 -t 700 -m "mvc" -i 24 -b $BM_FILE
-		aprun -n $P $APP_NAME -n $EXPERIMENT_NAME"_neuron_activity" -c $COMM_PATTERN -p $PARTITIONING -s $SEED -k 1000 -f 160 -t 700 -m "mvc" -i 24 -b $BM_FILE -w $ACTIVITY_FILE
-		#aprun -n $P $APP_NAME -n $EXPERIMENT_NAME -c $COMM_PATTERN -p $PARTITIONING -s $SEED -k 500 -f 1000 -t 750 -m "cm" -i 24 -b $BM_FILE
-		sleep 1
-	done
-}
+# run experiments
 
+COMM_PATTERN="nbx"
+SEED=$RANDOM
 
-
-
-for r in $(seq 1 $ITERATIONS)
+for i in $(seq 1 $REPETITIONS)
 do
-	SEED=$RANDOM
-	run_experiment $PROCESSES "prawV" "nbx" $SEED
-	run_experiment $PROCESSES "hypergraphPartitioning" "nbx" $SEED
+	# run baseline for all partitioning candidates
+	aprun -n $PROCESSES $APP_NAME -n $EXPERIMENT_NAME -c $COMM_PATTERN -p "prawV:hypergraphPartitioning" -s $SEED -k 1000 -f 160 -t 700 -m "mvc" -i 24 -b $BM_FILE -q ITERATIONS
+	sleep 1
 	
+	# run with neuron activity info (only supported by prawV)
+	aprun -n $PROCESSES $APP_NAME -n $EXPERIMENT_NAME"_neuron_activity" -c $COMM_PATTERN -p "prawV" -s $SEED -k 1000 -f 160 -t 700 -m "mvc" -i 24 -b $BM_FILE -W -q ITERATIONS
+	sleep 1
+
 done
+
 
 '''
 
