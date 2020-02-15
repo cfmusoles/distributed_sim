@@ -1,5 +1,5 @@
 # Create ARCHER job files based on parameters passed
-# This experiment focuses on comparing runtime impact on SNN simulations when using alternative partitioning methods to distribute workloads:
+# snn_praw: This experiment focuses on comparing runtime impact on SNN simulations when using alternative partitioning methods to distribute workloads:
 #	- zoltan
 #	- hyperPRAW (architecture aware streaming)
 # Both approaches are tested with and without previous neuron activity information
@@ -61,11 +61,11 @@ SEED=$RANDOM
 for i in $(seq 1 $REPETITIONS)
 do
 	# run baseline for all partitioning candidates
-	aprun -n $PROCESSES $APP_NAME -n $EXPERIMENT_NAME -c $COMM_PATTERN -p "prawV:hypergraphPartitioning" -s $SEED -k 1000 -f 160 -t 700 -m "mvc" -i 24 -b $BM_FILE -q ITERATIONS
+	aprun -n $PROCESSES $APP_NAME -n $EXPERIMENT_NAME -c $COMM_PATTERN -p "prawV:hypergraphPartitioning" -s $SEED -k 1000 -f 160 -t 700 -m "mvc" -i 24 -b $BM_FILE -q $ITERATIONS -T
 	sleep 1
 	
 	# run with neuron activity info (only supported by prawV)
-	aprun -n $PROCESSES $APP_NAME -n $EXPERIMENT_NAME"_neuron_activity" -c $COMM_PATTERN -p "prawV" -s $SEED -k 1000 -f 160 -t 700 -m "mvc" -i 24 -b $BM_FILE -W -q ITERATIONS
+	aprun -n $PROCESSES $APP_NAME -n $EXPERIMENT_NAME"_neuron_activity" -c $COMM_PATTERN -p "prawV" -s $SEED -k 1000 -f 160 -t 700 -m "mvc" -i 24 -b $BM_FILE -W -q $ITERATIONS
 	sleep 1
 
 done

@@ -5,9 +5,9 @@
 //#define RECORD_PROCESS_TRACE			// store processes trace information (timing for compute, comm, etc.)
 #define MEASURE_IDLE_TIME				// Separate comm into process idle (wait for others) and sync time
 //#define ADVANCED_COMM_STATS				// store, for each communication, size of message
-//#define ADVANCED_COMM_STATS_MATRIX_ONLY	// only store process-to-process total messaging (not individual message size) 
-#define VERBOSE						// display debugging information (build time)
-//#define PARTITION_CONNECTIVITY_GRAPH	// store partition connectivity graph
+#define ADVANCED_COMM_STATS_MATRIX_ONLY	// only store process-to-process total messaging (not individual message size) 
+//#define VERBOSE						// display debugging information (build time)
+#define PARTITION_CONNECTIVITY_GRAPH	// store partition connectivity graph
 					
 
 // TODO
@@ -256,6 +256,7 @@ int main(int argc, char** argv) {
 	char* model_selected = NULL;
 	int node_size = 24;
 	int sim_iters = 1;
+	bool max_streams = false;
 
 	Model model;
 	model.store_in_file = false;
@@ -266,7 +267,7 @@ int main(int argc, char** argv) {
 	extern char *optarg;
 	extern int optind, opterr, optopt;
 	int c;
-	while( (c = getopt(argc,argv,"n:c:p:s:WNh:b:k:f:t:m:i:q:")) != -1 ) {
+	while( (c = getopt(argc,argv,"n:c:p:s:WNh:b:k:f:t:m:i:q:T")) != -1 ) {
 		switch(c) {
 			case 'n': // test name
 				sim_name = optarg;
@@ -310,6 +311,9 @@ int main(int argc, char** argv) {
 				break;
 			case 'q': // simulation iterations
 				sim_iters = atoi(optarg);
+				break;
+			case 'T': // HyperPRAW only: use max number of streams
+				max_streams = true;
 				break;
 		}
 	}
@@ -1537,7 +1541,7 @@ int main(int argc, char** argv) {
 					else partition = new CustomPartitioning(&pops,population_size,custom_partitioning);
 				} else if(strcmp(part_method,"prawV") == 0) {  
 					PRINTF("%i: Partitioning: parallel edge partitioning PRAW\n",process_id);
-					partition = new HyperPRAWVertexPartitioning(&pops,population_size,comm_bandwidth_matrix_file);
+					partition = new HyperPRAWVertexPartitioning(&pops,population_size,comm_bandwidth_matrix_file,max_streams);
 				} else if(strcmp(part_method,"zoltanFile") == 0) {  
 					PRINTF("%i: Partitioning: Zoltan from file\n",process_id);
 					partition = new ZoltanFilePartitioning(&pops,population_size,comm_bandwidth_matrix_file);

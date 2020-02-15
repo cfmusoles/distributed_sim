@@ -17,8 +17,9 @@
 class HyperPRAWVertexPartitioning : public Partitioning {
 public:
 	
-	HyperPRAWVertexPartitioning(std::vector<Population*>* pops, int population_size, char* comm_bandwidth_file) : Partitioning(pops,population_size) {
+	HyperPRAWVertexPartitioning(std::vector<Population*>* pops, int population_size, char* comm_bandwidth_file, bool max_streams) : Partitioning(pops,population_size) {
 		comm_bandwidth_filename = comm_bandwidth_file;
+        use_max_streams = max_streams;
 	}
 	virtual ~HyperPRAWVertexPartitioning() {}
 	
@@ -26,7 +27,7 @@ public:
 		// fixed parameters for HyperPRAW
         int max_iterations = 100;
         float imbalance_tolerance = 1.2f;
-        int num_streams = partitions;
+        int num_streams = use_max_streams ? partitions : 1;
         bool local_parallel_update_only = false;
         int sync_batch_size = 1;
         bool input_order_round_robin = true;
@@ -161,6 +162,7 @@ public:
 
 private:
     char* comm_bandwidth_filename = NULL;
+    bool use_max_streams = false;
 };
 
 
