@@ -25,7 +25,7 @@ public:
 	
 	virtual void perform_partitioning(Model* model, int partitions, int process_id, std::vector<int>* previous_activity) {
 		// fixed parameters for HyperPRAW
-        int max_iterations = 100;
+        int max_iterations = 15;
         float imbalance_tolerance = 1.2f;
         int num_streams = use_max_streams ? partitions : 1;
         bool local_parallel_update_only = false;
