@@ -256,7 +256,6 @@ int main(int argc, char** argv) {
 	char* model_selected = NULL;
 	int node_size = 24;
 	int sim_iters = 1;
-	bool max_streams = false;
 
 	Model model;
 	model.store_in_file = false;
@@ -267,7 +266,7 @@ int main(int argc, char** argv) {
 	extern char *optarg;
 	extern int optind, opterr, optopt;
 	int c;
-	while( (c = getopt(argc,argv,"n:c:p:s:WNh:b:k:f:t:m:i:q:T")) != -1 ) {
+	while( (c = getopt(argc,argv,"n:c:p:s:WNh:b:k:f:t:m:i:q:")) != -1 ) {
 		switch(c) {
 			case 'n': // test name
 				sim_name = optarg;
@@ -311,9 +310,6 @@ int main(int argc, char** argv) {
 				break;
 			case 'q': // simulation iterations
 				sim_iters = atoi(optarg);
-				break;
-			case 'T': // HyperPRAW only: use max number of streams
-				max_streams = true;
 				break;
 		}
 	}
@@ -1539,9 +1535,12 @@ int main(int argc, char** argv) {
 					PRINTF("%i: Partitioning: custom\n",process_id);
 					if(custom_partitioning == NULL) partition = new RandomPartitioning(&pops,population_size);
 					else partition = new CustomPartitioning(&pops,population_size,custom_partitioning);
-				} else if(strcmp(part_method,"prawV") == 0) {  
+				} else if(strcmp(part_method,"prawV_seq") == 0) {  
 					PRINTF("%i: Partitioning: parallel edge partitioning PRAW\n",process_id);
-					partition = new HyperPRAWVertexPartitioning(&pops,population_size,comm_bandwidth_matrix_file,max_streams);
+					partition = new HyperPRAWVertexPartitioning(&pops,population_size,comm_bandwidth_matrix_file,false);
+				} else if(strcmp(part_method,"prawV_par") == 0) {  
+					PRINTF("%i: Partitioning: parallel edge partitioning PRAW\n",process_id);
+					partition = new HyperPRAWVertexPartitioning(&pops,population_size,comm_bandwidth_matrix_file,true);
 				} else if(strcmp(part_method,"zoltanFile") == 0) {  
 					PRINTF("%i: Partitioning: Zoltan from file\n",process_id);
 					partition = new ZoltanFilePartitioning(&pops,population_size,comm_bandwidth_matrix_file);
