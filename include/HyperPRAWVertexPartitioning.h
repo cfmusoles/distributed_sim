@@ -74,7 +74,7 @@ public:
                 comm_cost_matrix[ii] = (double*)calloc(partitions,sizeof(double));
             }
             // communication cost matrix
-            PRAW::get_comm_cost_matrix_from_bandwidth(comm_bandwidth_filename,comm_cost_matrix,partitions,false);  
+            PRAW::get_comm_cost_matrix_from_bandwidth(comm_bandwidth_filename,comm_cost_matrix,partitions,false);
 
             // create hMETIS file (distributed format)
             // each line represents a vertex (neuron) and the ids of the hyperedges (synapsys) that contain it

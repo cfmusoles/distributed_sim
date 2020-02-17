@@ -25,7 +25,7 @@ template_4='''
 
 APP_NAME="distSim"
 PRUNE_COLUMN=4 # propagation time (sync time + idle)
-ITERATIONS=2
+ITERS=3
 REPETITIONS=1
 PROCESSES='''
 template_5='''
@@ -61,11 +61,11 @@ SEED=$RANDOM
 for i in $(seq 1 $REPETITIONS)
 do
 	# run baseline for all partitioning candidates
-	aprun -n $PROCESSES $APP_NAME -n $EXPERIMENT_NAME -c $COMM_PATTERN -p "prawV_par:hypergraphPartitioning" -s $SEED -k 1000 -f 160 -t 700 -m "mvc" -i 24 -b $BM_FILE -q $ITERATIONS
+	aprun -n $PROCESSES $APP_NAME -n $EXPERIMENT_NAME -c $COMM_PATTERN -p "prawV_par:hypergraphPartitioning" -s $SEED -k 1000 -f 140 -t 700 -m "mvc" -i 24 -b $BM_FILE -q $ITERS
 	sleep 1
 	
 	# run with neuron activity info (only supported by prawV)
-	aprun -n $PROCESSES $APP_NAME -n $EXPERIMENT_NAME"_neuron_activity" -c $COMM_PATTERN -p "prawV_par" -s $SEED -k 1000 -f 160 -t 700 -m "mvc" -i 24 -b $BM_FILE -W -q $ITERATIONS
+	aprun -n $PROCESSES $APP_NAME -n $EXPERIMENT_NAME"_neuron_activity" -c $COMM_PATTERN -p "prawV_par" -s $SEED -k 1000 -f 140 -t 700 -m "mvc" -i 24 -b $BM_FILE -W -q $ITERS
 	sleep 1
 
 done

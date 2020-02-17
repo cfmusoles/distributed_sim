@@ -331,6 +331,7 @@ int main(int argc, char** argv) {
 	{
 		partitioning_methods.push_back(std::string(pch));
 		pch = strtok (NULL, ":");
+		
 	}
 	pch = strtok (comm_pattern,":");
 	std::vector<std::string> comm_pattern_methods;
