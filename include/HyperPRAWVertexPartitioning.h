@@ -27,7 +27,7 @@ public:
 		// fixed parameters for HyperPRAW
         int max_iterations = 15;
         float imbalance_tolerance = 1.2f;
-        int num_streams = use_max_streams ? partitions : 1;
+        int num_streams = use_max_streams ? min(96,partitions) : 1; // artificial limit due to memory requirements per stream
         bool local_parallel_update_only = false;
         int sync_batch_size = 1;
         bool input_order_round_robin = true;
