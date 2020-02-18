@@ -19,7 +19,7 @@ template_2 = '''
 template_3=''':bigmem='''
 template_4='''
 # walltime
-#PBS -l walltime=11:00:0
+#PBS -l walltime=10:00:0
 # budget code
 #PBS -A e582
 
@@ -61,11 +61,12 @@ SEED=$RANDOM
 for i in $(seq 1 $REPETITIONS)
 do
 	# run baseline for all partitioning candidates
-	aprun -n $PROCESSES $APP_NAME -n $EXPERIMENT_NAME -c $COMM_PATTERN -p "prawV_par:hypergraphPartitioning" -s $SEED -k 1000 -f 140 -t 700 -m "mvc" -i 24 -b $BM_FILE -q $ITERS
+	aprun -n $PROCESSES $APP_NAME -n $EXPERIMENT_NAME -c $COMM_PATTERN -p "prawV_par:hypergraphPartitioning" -s $SEED -k 1000 -f 80 -t 700 -m "mvc" -i 24 -b $BM_FILE -q $ITERS
 	sleep 1
 	
 	# run with neuron activity info (only supported by prawV)
-	aprun -n $PROCESSES $APP_NAME -n $EXPERIMENT_NAME"_neuron_activity" -c $COMM_PATTERN -p "prawV_par" -s $SEED -k 1000 -f 140 -t 700 -m "mvc" -i 24 -b $BM_FILE -W -q $ITERS
+	ACTIVITY_FILE=$EXPERIMENT_NAME"_prawV_par_"$COMM_PATTERN"__"$PROCESSES
+	aprun -n $PROCESSES $APP_NAME -n $EXPERIMENT_NAME"_neuron_activity" -c $COMM_PATTERN -p "prawV_par" -s $SEED -k 1000 -f 80 -t 700 -m "mvc" -i 24 -b $BM_FILE -w $ACTIVITY_FILE -q $ITERS
 	sleep 1
 
 done

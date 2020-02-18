@@ -250,6 +250,7 @@ int main(int argc, char** argv) {
 	int r_seed;
 	bool use_seed = false;
 	bool use_weight_file = false;
+	char* weight_file;
 	float n_scale = 1.0;
 	float k_scale = 1.0;
 	int t_end = 100;
@@ -266,7 +267,7 @@ int main(int argc, char** argv) {
 	extern char *optarg;
 	extern int optind, opterr, optopt;
 	int c;
-	while( (c = getopt(argc,argv,"n:c:p:s:WNh:b:k:f:t:m:i:q:")) != -1 ) {
+	while( (c = getopt(argc,argv,"n:c:p:s:w:Nh:b:k:f:t:m:i:q:")) != -1 ) {
 		switch(c) {
 			case 'n': // test name
 				sim_name = optarg;
@@ -281,8 +282,9 @@ int main(int argc, char** argv) {
 				r_seed = atoi(optarg);
 				use_seed = true;
 				break;
-			case 'W': // use neuron activity file (weights)
+			case 'w': // use neuron activity file (weights)
 				use_weight_file = true;
+				weight_file = optarg;
 				break;
 			case 'N':
 				model.null_compute = true;
@@ -1469,12 +1471,6 @@ int main(int argc, char** argv) {
 				int iteration = coms * comm_pattern_methods.size() + pats;
 				const char* comm_method = comm_pattern_methods[coms].c_str();
 				const char* part_method = partitioning_methods[pats].c_str();
-				std::string neuron_activity_file = sim_name;
-				neuron_activity_file += "_";
-				neuron_activity_file += partitioning_methods[pats] + "_" + comm_pattern_methods[coms] + "__";
-				std::string processes_str = std::to_string(num_processes);
-				neuron_activity_file += processes_str;
-				neuron_activity_file += "_neuron_activity";
 
 				// load neuron activity from file (if provided)
 				std::vector<int> previous_neuron_activity(population_size,1);
@@ -1482,7 +1478,7 @@ int main(int argc, char** argv) {
 					PRINTF("%i: Using previous neuron activity in partitioning...\n",process_id);
 					if(process_id == MASTER_NODE) {
 						// load from file
-						std::ifstream inputFile(neuron_activity_file.c_str());
+						std::ifstream inputFile(weight_file);
 						if (inputFile) {        
 							int value;
 							// read the elements in the file into a vector  
